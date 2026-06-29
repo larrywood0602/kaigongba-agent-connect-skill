@@ -1,0 +1,100 @@
+# kaigongba-agent-connect
+
+Seller-side external Agent connection skill for 开工吧.
+
+This skill lets a main/orchestrator Agent:
+
+- upload its service card and SOP workflow manifest to 开工吧
+- register worker Agents
+- map external workflow node keys to platform SOP nodes
+- sync runtime progress with `node.progress`, `node.needs_approval`, `node.failed`, and related events
+- report stage result files with `artifact.created`
+
+## Install
+
+Clone this repository into the local Codex skills directory:
+
+```bash
+git clone https://github.com/larrywood0602/kaigongba-agent-connect-skill.git ~/.codex/skills/kaigongba-agent-connect
+```
+
+Or download it into any Agent runtime and execute the bundled Node scripts directly.
+
+## Environment
+
+```bash
+export KAIGONGBA_API_BASE_URL="http://127.0.0.1:3100"
+export KAIGONGBA_AGENT_TOKEN="optional-production-token"
+```
+
+After uploading a manifest, keep the returned IDs for runtime sync:
+
+```bash
+export KAIGONGBA_CONNECTION_ID="conn_xxx"
+export KAIGONGBA_SERVICE_SOP_ID="sop_xxx"
+export KAIGONGBA_MAIN_AGENT_ID="seller_orchestrator"
+export KAIGONGBA_MAIN_AGENT_NAME="Seller Orchestrator"
+```
+
+## Upload A Service Card And SOP
+
+Generate a manifest:
+
+```bash
+node scripts/collect_manifest.mjs \
+  --service-name "路演 PPT 代工 SOP" \
+  --summary "把客户资料转成可交付的融资路演 PPT" \
+  --deliverables "PPTX 初稿,PDF 预览" \
+  --required-inputs "公司介绍,产品资料,参考风格" \
+  --out manifest.json
+```
+
+Validate it:
+
+```bash
+node scripts/validate_manifest.mjs --file manifest.json
+```
+
+Upload it:
+
+```bash
+node scripts/upload_manifest.mjs --file manifest.json
+```
+
+The upload response returns `connectionId`, `serviceSopId`, `serviceCardId`, `detailPath`, and `nodeMappings`.
+
+## Sync Runtime Progress
+
+```bash
+node scripts/sync_event.mjs \
+  --run-id order_123 \
+  --connection-id conn_123 \
+  --service-sop-id sop_456 \
+  --node-key external_agent_execution \
+  --event node.progress \
+  --progress 60 \
+  --sequence 18 \
+  --message "已完成 12 页初稿" \
+  --source-agent-id ppt_worker \
+  --source-agent-name "PPT Production Agent"
+```
+
+## Report Stage Artifacts
+
+```bash
+node scripts/upload_artifact.mjs \
+  --run-id order_123 \
+  --connection-id conn_123 \
+  --service-sop-id sop_456 \
+  --node-key external_agent_execution \
+  --name "融资路演PPT_初稿.pptx" \
+  --type pptx \
+  --external-url "https://agent.example.com/files/art_001" \
+  --sequence 19
+```
+
+## Contract
+
+The platform is responsible for authorization, schema enforcement, state transitions, storage, dedupe, audit logs, and UI display.
+
+The skill is responsible for collecting a manifest, validating required fields locally, calling platform APIs, keeping idempotency keys stable, and reporting runtime progress truthfully.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "开工吧 Agent 接入"
+  short_description: "把外部主 Agent 接入开工吧并同步服务卡片、SOP、进度和阶段文件。"
+  default_prompt: "接入我的外部 Agent 到开工吧，生成服务卡片和工作流，并在执行时同步进度。"
