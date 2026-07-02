@@ -1,0 +1,18 @@
+{
+  "name": "kaigongba-agent-connect-skill",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "kaigongba-agent-connect-skill": "scripts/install_and_connect.mjs"
+  },
+  "files": [
+    "SKILL.md",
+    "README.md",
+    "agents",
+    "references",
+    "scripts"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
