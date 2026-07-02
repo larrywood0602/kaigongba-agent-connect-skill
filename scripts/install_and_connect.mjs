@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiRequest, arg, parseArgs, required, writeConnectionConfig } from './lib.mjs'
+import { runOnboard } from './onboard.mjs'
 
 const args = parseArgs()
 const connectCode = required(arg(args, ['connect-code', 'connectCode'], process.env.KAIGONGBA_CONNECT_CODE), '--connect-code')
@@ -38,34 +39,52 @@ await installSkill(packageRoot, installDir)
 
 process.env.KAIGONGBA_CONNECTION_CONFIG = path.join(installDir, '.kaigongba/connection.json')
 
-const result = await apiRequest(`${apiBaseUrl}/api/agent-connect/token`, {
+const connectResult = await apiRequest(`${apiBaseUrl}/api/agent-connect/token`, {
   method: 'POST',
   body: JSON.stringify({ connectCode, agent }),
 })
 
 const config = {
-  apiBaseUrl: result.apiBaseUrl || apiBaseUrl,
-  connectionId: result.connectionId,
-  agentToken: result.agentToken,
-  scopes: result.scopes || [],
-  expiresAt: result.expiresAt,
+  apiBaseUrl: connectResult.apiBaseUrl || apiBaseUrl,
+  connectionId: connectResult.connectionId,
+  agentToken: connectResult.agentToken,
+  scopes: connectResult.scopes || [],
+  expiresAt: connectResult.expiresAt,
   mainAgent: agent,
 }
 const configPath = await writeConnectionConfig(config)
+const shouldOnboard = arg(args, 'onboard') === true
 
-process.stdout.write(
-  `${JSON.stringify(
-    {
-      ok: true,
-      installed: true,
-      installDir,
-      configPath,
-      apiBaseUrl: config.apiBaseUrl,
-      connectionId: config.connectionId,
-      scopes: config.scopes,
-      expiresAt: config.expiresAt,
-    },
-    null,
-    2,
-  )}\n`,
-)
+const result = {
+  ok: true,
+  installed: true,
+  installDir,
+  configPath,
+  apiBaseUrl: config.apiBaseUrl,
+  connectionId: config.connectionId,
+  scopes: config.scopes,
+  expiresAt: config.expiresAt,
+}
+
+if (shouldOnboard) {
+  const onboardResult = await runOnboard({
+    ...args,
+    'manifest-file': path.join(installDir, 'manifest.json'),
+    'discovery-file': path.join(installDir, 'discovery.json'),
+  })
+  process.stdout.write(`${JSON.stringify({ ...result, onboard: onboardResult }, null, 2)}\n`)
+  if (onboardResult.reviewUrl) {
+    process.stdout.write(`\nOpen ${onboardResult.reviewUrl} to review and upload this Agent service.\n`)
+  }
+} else {
+  process.stdout.write(
+    `${JSON.stringify(
+      {
+        ...result,
+        nextCommand: `cd ${installDir} && node scripts/onboard.mjs`,
+      },
+      null,
+      2,
+    )}\n`,
+  )
+}

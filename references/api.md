@@ -7,7 +7,7 @@ POST /api/agent-connect/token
 ```
 
 The Agent receives a one-time connect code from the platform UI, exchanges it for `apiBaseUrl`, `connectionId`, and `agentToken`, and stores those values in `.kaigongba/connection.json`.
-Use the platform-generated `npx -y github:larrywood0602/kaigongba-agent-connect-skill ...` command for first-time install. Pass the platform API address shown in the UI so remote Agents do not fall back to `127.0.0.1`.
+Use the platform-generated `npx -y github:larrywood0602/kaigongba-agent-connect-skill ... --onboard` command for first-time install and guided service upload. Pass the platform API address shown in the UI so remote Agents do not fall back to `127.0.0.1`.
 
 ## Endpoints
 
