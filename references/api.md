@@ -18,6 +18,7 @@ POST /api/agent-connections
 PATCH /api/agent-connections/:id/scopes
 POST /api/agent-connections/:id/manifest
 GET  /api/agent-connections/:id
+GET  /api/agent-connections/:id/runs
 POST /api/agent-connections/:id/revoke
 
 POST /api/workflow-runs/:runId/events
@@ -70,7 +71,7 @@ Local development fallback:
 ## Runtime sequence
 
 1. 开工吧 creates or starts an order.
-2. The main Agent receives the run/order ID from platform context.
+2. The main Agent calls `GET /api/agent-connections/:id/runs` or `node scripts/list_runs.mjs --summary` to fetch active order run IDs.
 3. The main Agent reports worker progress with `/events`.
 4. Stage files are reported as `artifact.created` metadata.
 5. Human approval nodes remain gated by platform UI.

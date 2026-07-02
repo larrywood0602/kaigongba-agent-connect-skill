@@ -70,7 +70,12 @@ With `--onboard`, it also discovers local skills/workflows/cases, generates `dis
    node scripts/upload_manifest.mjs --file manifest.json
    ```
 
-8. During execution, sync runtime events:
+8. Before execution, pull active platform runs:
+   ```bash
+   node scripts/list_runs.mjs --summary
+   ```
+
+9. During execution, sync runtime events:
    ```bash
    node scripts/sync_event.mjs \
      --run-id order_123 \
@@ -82,7 +87,7 @@ With `--onboard`, it also discovers local skills/workflows/cases, generates `dis
      --message "已完成 12 页初稿"
    ```
 
-9. Report stage artifacts:
+10. Report stage artifacts:
    ```bash
    node scripts/upload_artifact.mjs \
      --run-id order_123 \
@@ -118,5 +123,6 @@ With `--onboard`, it also discovers local skills/workflows/cases, generates `dis
 - `scripts/onboard.mjs`: run discovery, manifest generation, review, and optional upload.
 - `scripts/validate_manifest.mjs`: validate required fields or fetch platform schema.
 - `scripts/upload_manifest.mjs`: create/authorize a connection and upload manifest.
+- `scripts/list_runs.mjs`: fetch active platform order runs for this connection.
 - `scripts/sync_event.mjs`: send runtime node events.
 - `scripts/upload_artifact.mjs`: send artifact metadata as an `artifact.created` event.

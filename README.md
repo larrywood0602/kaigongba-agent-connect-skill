@@ -70,6 +70,16 @@ node scripts/upload_manifest.mjs --file manifest.json
 The upload response returns `connectionId`, `serviceSopId`, `serviceCardId`, `detailPath`, and `nodeMappings`.
 Keep `serviceSopId` in your runtime environment or local orchestration state when syncing order progress.
 
+## Pull Active Runs
+
+After the service is published and receives orders, fetch runnable platform orders:
+
+```bash
+node scripts/list_runs.mjs --summary
+```
+
+Use the returned `runId`, `serviceSopId`, and node mapping keys when reporting progress and artifacts.
+
 ## Sync Runtime Progress
 
 ```bash
