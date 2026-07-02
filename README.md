@@ -36,6 +36,14 @@ Then `--onboard` discovers local skills/workflows/cases, generates `discovery.js
 Production Agents should use this bootstrap flow instead of asking users to manually provide `KAIGONGBA_API_BASE_URL` or `KAIGONGBA_AGENT_TOKEN`.
 If the skill is already installed, run `node scripts/bootstrap_connection.mjs --api-base-url ... --connect-code ...` from the skill directory.
 
+Run the command from the real Agent project directory. If you run it elsewhere, pass the real source explicitly:
+
+```bash
+npx -y github:larrywood0602/kaigongba-agent-connect-skill --api-base-url https://api.kaigongba.com --connect-code kgbc_xxx --onboard --source-dir /path/to/your-agent-project
+```
+
+The discovery step excludes this connector skill, examples, fixtures, and tests. If no real source is found, the local review page will not allow upload.
+
 For a non-interactive trusted environment:
 
 ```bash

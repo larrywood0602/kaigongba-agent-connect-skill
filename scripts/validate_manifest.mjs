@@ -12,6 +12,9 @@ export function validateManifest(manifest) {
   if (!manifest?.mainAgent?.name) errors.push('mainAgent.name is required')
   if (!manifest?.serviceCard?.name) errors.push('serviceCard.name is required')
   if (!manifest?.serviceCard?.tagline) warnings.push('serviceCard.tagline is recommended for the service card cover')
+  if (manifest?.discoverySummary?.requiresSourceSelection) {
+    errors.push('no real Agent skill/SOP source was discovered; run from your Agent project directory or pass --source-dir /path/to/agent-project')
+  }
 
   const nodes = Array.isArray(manifest?.workflow?.nodes) ? manifest.workflow.nodes : []
   if (!nodes.length) errors.push('workflow.nodes must contain at least one node')

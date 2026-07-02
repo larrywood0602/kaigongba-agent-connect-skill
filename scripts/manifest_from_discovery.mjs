@@ -55,14 +55,15 @@ export function manifestFromDiscovery(discovery, options = {}) {
 
   const primarySkill = skills[0]
   const primaryWorkflow = workflows[0]
-  const serviceName = String(options.serviceName || primaryWorkflow?.name || primarySkill?.title || primarySkill?.name || '外部 Agent 服务 SOP')
+  const hasRealSource = skills.length + workflows.length + cases.length > 0
+  const serviceName = String(options.serviceName || primaryWorkflow?.name || primarySkill?.title || primarySkill?.name || (hasRealSource ? '外部 Agent 服务 SOP' : '待选择真实 Agent 技能来源'))
   const serviceKey = stableKey(serviceName, 'external_agent_service')
   const workerId = String(options.workerId || `${serviceKey}_worker`)
   const mainAgent = Array.isArray(discovery.agents) && discovery.agents[0] ? discovery.agents[0] : {}
 
   const discoveredNodes = workflows.length
     ? workflows.flatMap((workflow) => workflow.nodes || []).map((node, index) => nodeFromDiscoveredNode(node, index, workerId))
-    : skills.slice(0, Math.max(skills.length, 1)).map((skill, index) => ({
+    : skills.map((skill, index) => ({
         key: stableKey(skill.name || skill.title, `external_skill_${index + 1}`),
         name: skill.title || skill.name || `外部技能 ${index + 1}`,
         ownerKind: 'external_agent',
@@ -145,15 +146,23 @@ export function manifestFromDiscovery(discovery, options = {}) {
       })),
     },
     workflow: {
-      nodes: workflowNodes,
+      nodes: hasRealSource ? workflowNodes : [],
     },
     discoverySummary: {
       skillCount: skills.length,
       workflowCount: workflows.length,
       caseCount: cases.length,
+      requiresSourceSelection: !hasRealSource,
+      sourceDirs: Array.isArray(discovery.sourceDirs) ? discovery.sourceDirs : [],
+      warnings: Array.isArray(discovery.warnings) ? discovery.warnings : [],
       selectedSkillIds: skills.map((item) => item.id),
       selectedWorkflowIds: workflows.map((item) => item.id),
       selectedCaseIds: cases.map((item) => item.id),
+      selectedSourcePaths: [
+        ...skills.map((item) => item.sourcePath).filter(Boolean),
+        ...workflows.map((item) => item.sourcePath).filter(Boolean),
+        ...cases.map((item) => item.sourcePath).filter(Boolean),
+      ],
     },
   }
 }

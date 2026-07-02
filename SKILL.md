@@ -27,11 +27,17 @@ npx -y github:larrywood0602/kaigongba-agent-connect-skill --api-base-url https:/
 The npx entry installs this skill into `${CODEX_HOME:-~/.codex}/skills/kaigongba-agent-connect`, exchanges the code for `apiBaseUrl`, `connectionId`, and an agent token, then writes `.kaigongba/connection.json`.
 With `--onboard`, it also discovers local skills/workflows/cases, generates `discovery.json` and `manifest.json`, then starts a local review page. Other scripts read this connection file automatically. Environment variables are only for local development overrides.
 
+Run the command from the real Agent project directory, or pass `--source-dir /path/to/your-agent-project`. The skill intentionally excludes `kaigongba-agent-connect` itself, examples, fixtures, and test files so demo manifests are not uploaded as real services.
+
 ## Onboarding workflow
 
 1. Bootstrap the platform connection:
    ```bash
    npx -y github:larrywood0602/kaigongba-agent-connect-skill --api-base-url https://api.kaigongba.com --connect-code kgbc_xxx --onboard
+   ```
+   If the command is not executed from your Agent project, pass the real source explicitly:
+   ```bash
+   npx -y github:larrywood0602/kaigongba-agent-connect-skill --api-base-url https://api.kaigongba.com --connect-code kgbc_xxx --onboard --source-dir /path/to/your-agent-project
    ```
 
 2. Review the generated local page and confirm upload. For non-interactive runs, use:

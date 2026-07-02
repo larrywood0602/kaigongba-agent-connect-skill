@@ -2,11 +2,12 @@
 import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { arg, listArg, parseArgs, stableKey, writeJson } from './lib.mjs'
 
 const SKIP_DIRS = new Set(['.git', '.kaigongba', 'node_modules', 'dist', 'build', '.next', '.cache'])
 const CASE_EXTENSIONS = new Set(['.pdf', '.pptx', '.docx', '.xlsx', '.png', '.jpg', '.jpeg', '.md', '.txt'])
+const PACKAGE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 async function exists(filePath) {
   try {
@@ -65,6 +66,22 @@ function uniquePaths(paths) {
   return [...new Set(paths.map((item) => path.resolve(item)).filter(Boolean))]
 }
 
+function isInsidePath(filePath, parentPath) {
+  const relative = path.relative(path.resolve(parentPath), path.resolve(filePath))
+  return relative === '' || Boolean(relative && !relative.startsWith('..') && !path.isAbsolute(relative))
+}
+
+function looksLikeExample(filePath) {
+  const segments = filePath.split(path.sep).map((segment) => segment.toLowerCase())
+  const base = path.basename(filePath).toLowerCase()
+  return base.includes('example') || segments.some((segment) => ['example', 'examples', 'fixtures', '__fixtures__', 'test', 'tests'].includes(segment))
+}
+
+function looksLikeConnectorSelf(filePath) {
+  const segments = filePath.split(path.sep).map((segment) => segment.toLowerCase())
+  return segments.includes('kaigongba-agent-connect') || segments.includes('kaigongba-agent-connect-skill')
+}
+
 function defaultSourceDirs() {
   return [
     process.cwd(),
@@ -96,9 +113,11 @@ function workflowFromManifest(payload, filePath) {
 export async function discoverCapabilities(options = {}) {
   const explicitSources = listArg(options.sourceDirs ?? options.sourceDir)
   const sourceDirs = uniquePaths(explicitSources.length ? explicitSources : defaultSourceDirs())
+  const includeSelf = options.includeSelf === true || options.includeSelf === 'true'
   const skills = []
   const workflows = []
   const cases = []
+  const skipped = []
   const seenSkills = new Set()
   const seenWorkflows = new Set()
   const seenCases = new Set()
@@ -107,6 +126,14 @@ export async function discoverCapabilities(options = {}) {
     if (!(await exists(sourceDir))) continue
     const files = await walk(sourceDir, { maxDepth: Number(options.maxDepth ?? 4), maxFiles: Number(options.maxFiles ?? 300) })
     for (const filePath of files) {
+      if (!includeSelf && (isInsidePath(filePath, PACKAGE_ROOT) || looksLikeConnectorSelf(filePath))) {
+        skipped.push({ sourcePath: filePath, reason: 'kaigongba_connect_skill_self' })
+        continue
+      }
+      if (looksLikeExample(filePath)) {
+        skipped.push({ sourcePath: filePath, reason: 'example_or_test_file' })
+        continue
+      }
       const basename = path.basename(filePath)
       const ext = path.extname(filePath).toLowerCase()
 
@@ -122,6 +149,7 @@ export async function discoverCapabilities(options = {}) {
             title: parsed.title,
             description: parsed.description,
             sourcePath: filePath,
+            sourceKind: 'skill',
           })
         }
       }
@@ -132,7 +160,7 @@ export async function discoverCapabilities(options = {}) {
           const workflow = workflowFromManifest(payload, filePath)
           if (workflow && !seenWorkflows.has(workflow.id)) {
             seenWorkflows.add(workflow.id)
-            workflows.push(workflow)
+            workflows.push({ ...workflow, sourceKind: 'workflow_manifest' })
           }
         } catch {
           // Ignore non-manifest JSON files.
@@ -149,6 +177,7 @@ export async function discoverCapabilities(options = {}) {
             title: path.basename(filePath, ext),
             type: ext.slice(1) || 'file',
             sourcePath: filePath,
+            sourceKind: 'case_file',
           })
         }
       }
@@ -162,6 +191,13 @@ export async function discoverCapabilities(options = {}) {
     skills,
     workflows,
     cases,
+    skipped,
+    warnings: skills.length + workflows.length + cases.length === 0
+      ? [
+          '未发现真实 Agent 技能、SOP 或案例。请从你的 Agent 项目目录运行该命令，或传入 --source-dir /path/to/your-agent-project。',
+          '默认已排除 kaigongba-agent-connect 自身、examples、fixtures 和测试文件，避免上传 demo。',
+        ]
+      : [],
     agents: [
       {
         externalAgentId: String(options.mainAgentId || 'openclaw_orchestrator'),
@@ -180,6 +216,7 @@ async function main() {
     maxFiles: arg(args, 'max-files', 300),
     mainAgentId: arg(args, ['main-agent-id', 'mainAgentId']),
     mainAgentName: arg(args, ['main-agent-name', 'mainAgentName']),
+    includeSelf: arg(args, 'include-self', false),
   })
   await writeJson(String(arg(args, 'out', 'discovery.json')), discovery)
 }

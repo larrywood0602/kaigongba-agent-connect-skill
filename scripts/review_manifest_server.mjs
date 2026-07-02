@@ -21,6 +21,8 @@ async function readRequestJson(req) {
 
 function reviewHtml({ manifest, validation }) {
   const manifestText = JSON.stringify(manifest, null, 2)
+  const sourcePaths = Array.isArray(manifest.discoverySummary?.selectedSourcePaths) ? manifest.discoverySummary.selectedSourcePaths : []
+  const sourceWarnings = Array.isArray(manifest.discoverySummary?.warnings) ? manifest.discoverySummary.warnings : []
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -46,6 +48,7 @@ function reviewHtml({ manifest, validation }) {
     .ok { color: #047857; }
     .warn { color: #b45309; }
     .err { color: #b91c1c; }
+    .sources { margin: 10px 0 0; padding-left: 18px; color: #475467; font-size: 12px; line-height: 1.5; }
     pre { white-space: pre-wrap; background: #111827; color: #f9fafb; border-radius: 8px; padding: 12px; overflow: auto; }
   </style>
 </head>
@@ -56,7 +59,7 @@ function reviewHtml({ manifest, validation }) {
       <h1>确认要上传到开工吧的 Agent 服务</h1>
       <p>请检查技能名称、SOP 节点、交付物、所需输入、风险边界和真人负责人。确认后会上传为平台服务草稿，不会自动发布市场。</p>
     </div>
-    <button id="upload">确认上传</button>
+    <button id="upload" ${validation.ok ? '' : 'disabled'}>${validation.ok ? '确认上传' : '无法上传'}</button>
   </header>
   <div class="grid">
     <section class="panel">
@@ -64,13 +67,16 @@ function reviewHtml({ manifest, validation }) {
       <div class="metric"><span>SOP 节点</span><b>${manifest.workflow?.nodes?.length || 0}</b></div>
       <div class="metric"><span>交付物</span><b>${htmlEscape((manifest.serviceCard?.deliverables || []).join('、') || '未填写')}</b></div>
       <div class="metric"><span>输入材料</span><b>${htmlEscape((manifest.serviceCard?.requiredInputs || []).join('、') || '未填写')}</b></div>
+      <div class="metric"><span>真实来源</span><b>${sourcePaths.length ? `${sourcePaths.length} 个文件` : '未发现'}</b></div>
       <div class="metric"><span>校验</span><b class="${validation.ok ? 'ok' : 'err'}">${validation.ok ? '可上传' : '需要修正'}</b></div>
+      ${sourcePaths.length ? `<ul class="sources">${sourcePaths.slice(0, 8).map((item) => `<li>${htmlEscape(item)}</li>`).join('')}${sourcePaths.length > 8 ? `<li>还有 ${sourcePaths.length - 8} 个来源...</li>` : ''}</ul>` : ''}
+      ${sourceWarnings.length ? `<p class="warn">${htmlEscape(sourceWarnings.join('；'))}</p>` : ''}
       ${validation.warnings.length ? `<p class="warn">${htmlEscape(validation.warnings.join('；'))}</p>` : ''}
       ${validation.errors.length ? `<p class="err">${htmlEscape(validation.errors.join('；'))}</p>` : ''}
       <div class="actions">
         <button class="secondary" id="validate">重新校验</button>
       </div>
-      <pre id="result">等待确认上传。</pre>
+      <pre id="result">${validation.ok ? '等待确认上传。' : '没有真实 Agent 技能/SOP 来源时不会上传。请从你的 Agent 项目目录重新运行命令，或传入 --source-dir /path/to/your-agent-project。'}</pre>
     </section>
     <section class="panel">
       <textarea id="manifest">${htmlEscape(manifestText)}</textarea>
@@ -86,6 +92,7 @@ async function post(path) {
   const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
   const json = await res.json()
   result.textContent = JSON.stringify(json, null, 2)
+  if (path === '/validate') upload.disabled = !json.ok
   if (!res.ok) throw new Error(json.message || 'request failed')
   return json
 }

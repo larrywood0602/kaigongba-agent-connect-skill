@@ -41,7 +41,7 @@ export async function runOnboard(args = {}) {
   await writeJson(manifestFile, manifest)
 
   const validation = validateManifest(manifest)
-  if (!validation.ok) {
+  if (!validation.ok && arg(args, ['yes', 'upload']) === true) {
     return { ok: false, discoveryFile, manifestFile, discovery, validation }
   }
 
@@ -55,14 +55,14 @@ export async function runOnboard(args = {}) {
     port: Number(arg(args, 'port', 5678)),
     host: String(arg(args, 'host', '127.0.0.1')),
   })
-  return { ok: true, uploaded: false, discoveryFile, manifestFile, discovery, validation, reviewUrl: url }
+  return { ok: validation.ok, uploaded: false, discoveryFile, manifestFile, discovery, validation, reviewUrl: url }
 }
 
 async function main() {
   const args = parseArgs()
   const result = await runOnboard(args)
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
-  if (!result.ok) process.exit(1)
+  if (!result.ok && !result.reviewUrl) process.exit(1)
   if (result.reviewUrl) {
     process.stdout.write(`\nOpen ${result.reviewUrl} to confirm and upload this Agent service.\n`)
   }
