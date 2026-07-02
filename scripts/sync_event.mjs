@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-import { apiRequest, arg, defaultStatus, numberArg, parseArgs, required } from './lib.mjs'
+import { apiRequest, arg, defaultStatus, numberArg, parseArgs, readConnectionConfig, required } from './lib.mjs'
 
 const args = parseArgs()
+const config = await readConnectionConfig()
 const runId = required(arg(args, ['run-id', 'runId']), '--run-id')
 const eventType = required(arg(args, ['event', 'event-type', 'eventType']), '--event')
 const nodeKey = arg(args, ['node-key', 'nodeKey'])
@@ -13,8 +14,8 @@ if (!idempotencyKey && sequence === undefined) {
 }
 
 const payload = {
-  connectionId: arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID),
-  serviceSopId: arg(args, ['service-sop-id', 'serviceSopId'], process.env.KAIGONGBA_SERVICE_SOP_ID),
+  connectionId: arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId),
+  serviceSopId: arg(args, ['service-sop-id', 'serviceSopId'], process.env.KAIGONGBA_SERVICE_SOP_ID || config.serviceSopId),
   nodeKey,
   event: eventType,
   status: arg(args, 'status', defaultStatus(eventType)),
@@ -30,8 +31,8 @@ if (sourceAgentId || sourceAgentName) {
   payload.sourceAgent = { id: sourceAgentId, name: sourceAgentName }
 }
 
-const reporterId = arg(args, ['reported-by-agent-id', 'reportedByAgentId'], process.env.KAIGONGBA_MAIN_AGENT_ID)
-const reporterName = arg(args, ['reported-by-agent-name', 'reportedByAgentName'], process.env.KAIGONGBA_MAIN_AGENT_NAME)
+const reporterId = arg(args, ['reported-by-agent-id', 'reportedByAgentId'], process.env.KAIGONGBA_MAIN_AGENT_ID || config.mainAgent?.externalAgentId)
+const reporterName = arg(args, ['reported-by-agent-name', 'reportedByAgentName'], process.env.KAIGONGBA_MAIN_AGENT_NAME || config.mainAgent?.name)
 if (reporterId || reporterName) {
   payload.reportedByAgent = { id: reporterId, name: reporterName }
 }

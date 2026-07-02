@@ -62,6 +62,26 @@ export async function readJson(filePath) {
   return JSON.parse(raw)
 }
 
+export function connectionConfigPath() {
+  return process.env.KAIGONGBA_CONNECTION_CONFIG || path.resolve(process.cwd(), '.kaigongba/connection.json')
+}
+
+export async function readConnectionConfig() {
+  try {
+    return await readJson(connectionConfigPath())
+  } catch (error) {
+    if (error?.code === 'ENOENT') return {}
+    throw error
+  }
+}
+
+export async function writeConnectionConfig(config) {
+  const filePath = connectionConfigPath()
+  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  await fs.writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
+  return filePath
+}
+
 export async function writeJson(filePath, payload) {
   const serialized = `${JSON.stringify(payload, null, 2)}\n`
   if (!filePath || filePath === '-') {
@@ -72,18 +92,26 @@ export async function writeJson(filePath, payload) {
   await fs.writeFile(filePath, serialized, 'utf8')
 }
 
-export function apiBase() {
-  return (process.env.KAIGONGBA_API_BASE_URL || 'http://127.0.0.1:3100').replace(/\/+$/, '')
+export function apiBase(config = {}) {
+  return (process.env.KAIGONGBA_API_BASE_URL || config.apiBaseUrl || 'http://127.0.0.1:3100').replace(/\/+$/, '')
 }
 
 export async function apiRequest(apiPath, options = {}) {
-  const url = apiPath.startsWith('http') ? apiPath : `${apiBase()}${apiPath}`
+  const config = await readConnectionConfig()
+  const url = apiPath.startsWith('http') ? apiPath : `${apiBase(config)}${apiPath}`
   const headers = {
     'Content-Type': 'application/json',
     ...(options.headers || {}),
   }
-  if (process.env.KAIGONGBA_AGENT_TOKEN) {
-    headers.Authorization = `Bearer ${process.env.KAIGONGBA_AGENT_TOKEN}`
+  const agentToken = process.env.KAIGONGBA_AGENT_TOKEN || config.agentToken
+  if (agentToken) {
+    headers.Authorization = `Bearer ${agentToken}`
+  }
+  if (process.env.KAIGONGBA_USER_ID) {
+    headers['X-User-Id'] = process.env.KAIGONGBA_USER_ID
+  }
+  if (process.env.KAIGONGBA_USER_NAME) {
+    headers['X-User-Name'] = process.env.KAIGONGBA_USER_NAME
   }
 
   const response = await fetch(url, { ...options, headers })

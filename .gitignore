@@ -1,5 +1,6 @@
 manifest.json
 *.local.json
 .env
+.kaigongba/
 .DS_Store
 node_modules/

@@ -1,19 +1,23 @@
 # 开工吧 Agent Connection API
 
-Default API base:
+Default production flow:
 
 ```text
-KAIGONGBA_API_BASE_URL=http://127.0.0.1:3100
+POST /api/agent-connect/token
 ```
+
+The Agent receives a one-time connect code from the platform UI, exchanges it for `apiBaseUrl`, `connectionId`, and `agentToken`, and stores those values in `.kaigongba/connection.json`.
 
 ## Endpoints
 
 ```text
 GET  /api/agent-schemas/manifest
+POST /api/agent-connect/token
 POST /api/agent-connections
 PATCH /api/agent-connections/:id/scopes
 POST /api/agent-connections/:id/manifest
 GET  /api/agent-connections/:id
+POST /api/agent-connections/:id/revoke
 
 POST /api/workflow-runs/:runId/events
 GET  /api/workflow-runs/:runId/events
@@ -23,6 +27,23 @@ POST /api/artifacts/:id/complete
 ```
 
 ## Onboarding sequence
+
+1. Exchange the platform connect code:
+   ```json
+   {
+     "connectCode": "kgbc_xxx",
+     "agent": {
+       "provider": "openclaw",
+       "externalAgentId": "openclaw_orchestrator",
+       "name": "OpenClaw Orchestrator",
+       "version": "1.0.0"
+     }
+   }
+   ```
+
+2. Upload manifest to create a draft service card and SOP.
+
+Local development fallback:
 
 1. Create a connection:
    ```json
@@ -55,10 +76,17 @@ POST /api/artifacts/:id/complete
 
 ## Auth header
 
-Production integrations should send:
+Production integrations should send the token returned by connect-code exchange:
 
 ```text
 Authorization: Bearer $KAIGONGBA_AGENT_TOKEN
 ```
 
-The local prototype currently accepts requests without auth so the workflow can be tested end to end.
+Local development can still use `KAIGONGBA_API_BASE_URL`, `KAIGONGBA_AGENT_TOKEN`, and dev headers.
+
+For local user isolation tests, send the same user identity that the browser session should inspect:
+
+```text
+X-User-Id: $KAIGONGBA_USER_ID
+X-User-Name: $KAIGONGBA_USER_NAME
+```
