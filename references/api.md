@@ -7,6 +7,7 @@ POST /api/agent-connect/token
 ```
 
 The Agent receives a one-time connect code from the platform UI, exchanges it for `apiBaseUrl`, `connectionId`, and `agentToken`, and stores those values in `.kaigongba/connection.json`.
+Pass the platform API address shown in the UI to `bootstrap_connection.mjs` so remote Agents do not fall back to `127.0.0.1`.
 
 ## Endpoints
 
