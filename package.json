@@ -1,16 +1,42 @@
 {
   "name": "kaigongba-agent-connect-skill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "bin": {
     "kaigongba-agent-connect-skill": "scripts/install_and_connect.mjs"
   },
   "files": [
+    "manifest.json",
     "SKILL.md",
     "README.md",
-    "agents",
-    "references",
-    "scripts"
+    "agents/openai.yaml",
+    "assets/manifest.example.json",
+    "references/api.md",
+    "references/manifest-schema.md",
+    "references/event-schema.md",
+    "scripts/action_record.mjs",
+    "scripts/bootstrap_connection.mjs",
+    "scripts/collect_manifest.mjs",
+    "scripts/create_service_from_capability.mjs",
+    "scripts/discover_capabilities.mjs",
+    "scripts/install_and_connect.mjs",
+    "scripts/lib.mjs",
+    "scripts/list_runs.mjs",
+    "scripts/manifest_from_discovery.mjs",
+    "scripts/onboard.mjs",
+    "scripts/publish_service.mjs",
+    "scripts/readiness.mjs",
+    "scripts/refresh_manifest.mjs",
+    "scripts/review_manifest_server.mjs",
+    "scripts/runtime_tick.mjs",
+    "scripts/sync_capabilities.mjs",
+    "scripts/sync_event.mjs",
+    "scripts/update_skill.mjs",
+    "scripts/upload_artifact.mjs",
+    "scripts/upload_manifest.mjs",
+    "scripts/validate_manifest.mjs",
+    "scripts/validate_skill.mjs",
+    "scripts/verify_real_platform.mjs"
   ],
   "engines": {
     "node": ">=20"

@@ -45,6 +45,53 @@ function normalizeNodes(nodes) {
   }))
 }
 
+function capabilitiesFromSkills(skills) {
+  return skills.map((skill) => {
+    const name = skill.title || skill.name
+    const safeName = name || '外部 Agent 技能'
+    const tags = [...new Set([skill.name, skill.title, skill.id].filter(Boolean).map((item) => String(item).trim()).filter(Boolean))]
+    return {
+      externalId: skill.id || stableKey(name, 'skill'),
+      name,
+      description: skill.description || '',
+      capabilityType: 'skill',
+      status: 'active',
+      listingStatus: 'not_listed',
+      sourceKind: skill.sourceKind || 'skill',
+      sourcePath: skill.sourcePath || '',
+      sourceFingerprint: stableKey([skill.id, skill.name, skill.title, skill.sourcePath].filter(Boolean).join('|'), 'skill'),
+      tags: tags.slice(0, 8),
+      targetCustomers: [
+        `需要${safeName}能力交付的客户`,
+        '希望把外部 Agent 执行结果托管到开工吧的服务方',
+      ],
+      deliverables: [
+        `${safeName}执行结果`,
+        '执行过程记录与交付说明',
+      ],
+      requiredInputs: [
+        '任务目标与业务上下文',
+        '必要素材、账号授权或数据来源',
+        '明确的验收标准',
+      ],
+      riskBoundaries: [
+        '不处理未授权的隐私资料、密钥或受限数据',
+        '不承诺平台外不可验证的业务结果',
+        '需要人工确认的发布、付款、授权和高风险动作必须等待确认',
+      ],
+      acceptanceCriteria: [
+        '交付物可在平台或约定链接中查看',
+        '关键执行进度已回传平台',
+        '结果满足用户提供的验收标准',
+      ],
+      metadata: {
+        discoveredTitle: skill.title || '',
+        discoveredName: skill.name || '',
+      },
+    }
+  })
+}
+
 export function manifestFromDiscovery(discovery, options = {}) {
   const selectedSkillIds = normalizeList(options.skills)
   const selectedWorkflowIds = normalizeList(options.workflows)
@@ -53,25 +100,18 @@ export function manifestFromDiscovery(discovery, options = {}) {
   const workflows = selectedItems(Array.isArray(discovery.workflows) ? discovery.workflows : [], selectedWorkflowIds)
   const cases = selectedItems(Array.isArray(discovery.cases) ? discovery.cases : [], selectedCaseIds).slice(0, 12)
 
-  const primarySkill = skills[0]
   const primaryWorkflow = workflows[0]
+  const mainAgent = Array.isArray(discovery.agents) && discovery.agents[0] ? discovery.agents[0] : {}
   const hasRealSource = skills.length + workflows.length + cases.length > 0
-  const serviceName = String(options.serviceName || primaryWorkflow?.name || primarySkill?.title || primarySkill?.name || (hasRealSource ? '外部 Agent 服务 SOP' : '待选择真实 Agent 技能来源'))
+  const capabilityOnly = workflows.length === 0 && skills.length > 0
+  const inventoryName = mainAgent.name ? `${mainAgent.name} 能力清单` : '外部 Agent 能力清单'
+  const serviceName = String(options.serviceName || primaryWorkflow?.name || (capabilityOnly ? inventoryName : hasRealSource ? '外部 Agent 服务 SOP' : '待选择真实 Agent 技能来源'))
   const serviceKey = stableKey(serviceName, 'external_agent_service')
   const workerId = String(options.workerId || `${serviceKey}_worker`)
-  const mainAgent = Array.isArray(discovery.agents) && discovery.agents[0] ? discovery.agents[0] : {}
 
   const discoveredNodes = workflows.length
     ? workflows.flatMap((workflow) => workflow.nodes || []).map((node, index) => nodeFromDiscoveredNode(node, index, workerId))
-    : skills.map((skill, index) => ({
-        key: stableKey(skill.name || skill.title, `external_skill_${index + 1}`),
-        name: skill.title || skill.name || `外部技能 ${index + 1}`,
-        ownerKind: 'external_agent',
-        sourceAgentId: workerId,
-        isAuto: true,
-        requiresHuman: false,
-        artifactTypes: ['file'],
-      }))
+    : []
 
   const hasOpeningHuman = discoveredNodes.some((node, index) => index < 2 && node.ownerKind === 'human')
   const hasClosingHuman = discoveredNodes.some((node, index) => index >= discoveredNodes.length - 2 && node.ownerKind === 'human')
@@ -125,7 +165,7 @@ export function manifestFromDiscovery(discovery, options = {}) {
     ],
     serviceCard: {
       name: serviceName,
-      tagline: String(options.tagline || primarySkill?.description || primaryWorkflow?.summary || '把外部 Agent 能力变成可接单、可跟踪、可验收的服务 SOP'),
+      tagline: String(options.tagline || primaryWorkflow?.summary || (capabilityOnly ? '同步外部 Agent 技能为平台能力，等待选择后创建可接单服务 SOP' : '把外部 Agent 能力变成可接单、可跟踪、可验收的服务 SOP')),
       category: String(options.category || '外部 Agent 服务'),
       targetCustomers,
       deliverables,
@@ -145,8 +185,9 @@ export function manifestFromDiscovery(discovery, options = {}) {
         type: item.type,
       })),
     },
+    capabilities: capabilitiesFromSkills(skills),
     workflow: {
-      nodes: hasRealSource ? workflowNodes : [],
+      nodes: workflows.length ? workflowNodes : [],
     },
     discoverySummary: {
       skillCount: skills.length,
@@ -189,7 +230,7 @@ async function main() {
     mainAgentName: arg(args, ['main-agent-name', 'mainAgentName']),
     endpoint: arg(args, 'endpoint'),
   })
-  await writeJson(String(arg(args, 'out', 'manifest.json')), manifest)
+  await writeJson(String(arg(args, 'out', 'capabilities-manifest.json')), manifest)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

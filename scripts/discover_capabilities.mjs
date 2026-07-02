@@ -82,12 +82,13 @@ function looksLikeConnectorSelf(filePath) {
   return segments.includes('kaigongba-agent-connect') || segments.includes('kaigongba-agent-connect-skill')
 }
 
-function defaultSourceDirs() {
-  return [
-    process.cwd(),
-    path.join(os.homedir(), '.codex/skills'),
-    path.join(os.homedir(), '.agents/skills'),
-  ]
+function defaultSourceDirs({ includeGlobalSkills = false } = {}) {
+  const dirs = [process.cwd()]
+  if (includeGlobalSkills) {
+    dirs.push(path.join(os.homedir(), '.codex/skills'))
+    dirs.push(path.join(os.homedir(), '.agents/skills'))
+  }
+  return dirs
 }
 
 function workflowFromManifest(payload, filePath) {
@@ -112,7 +113,8 @@ function workflowFromManifest(payload, filePath) {
 
 export async function discoverCapabilities(options = {}) {
   const explicitSources = listArg(options.sourceDirs ?? options.sourceDir)
-  const sourceDirs = uniquePaths(explicitSources.length ? explicitSources : defaultSourceDirs())
+  const includeGlobalSkills = options.includeGlobalSkills === true || options.includeGlobalSkills === 'true'
+  const sourceDirs = uniquePaths(explicitSources.length ? explicitSources : defaultSourceDirs({ includeGlobalSkills }))
   const includeSelf = options.includeSelf === true || options.includeSelf === 'true'
   const skills = []
   const workflows = []
@@ -195,7 +197,7 @@ export async function discoverCapabilities(options = {}) {
     warnings: skills.length + workflows.length + cases.length === 0
       ? [
           '未发现真实 Agent 技能、SOP 或案例。请从你的 Agent 项目目录运行该命令，或传入 --source-dir /path/to/your-agent-project。',
-          '默认已排除 kaigongba-agent-connect 自身、examples、fixtures 和测试文件，避免上传 demo。',
+          '默认只扫描当前 Agent 项目目录，并排除 kaigongba-agent-connect 自身、examples、fixtures 和测试文件，避免上传 demo。',
         ]
       : [],
     agents: [
@@ -217,6 +219,7 @@ async function main() {
     mainAgentId: arg(args, ['main-agent-id', 'mainAgentId']),
     mainAgentName: arg(args, ['main-agent-name', 'mainAgentName']),
     includeSelf: arg(args, 'include-self', false),
+    includeGlobalSkills: arg(args, ['include-global-skills', 'includeGlobalSkills'], false),
   })
   await writeJson(String(arg(args, 'out', 'discovery.json')), discovery)
 }

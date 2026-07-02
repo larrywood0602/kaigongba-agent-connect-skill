@@ -24,6 +24,16 @@ const agent = {
 
 async function installSkill(sourceDir, targetDir) {
   if (path.resolve(sourceDir) === path.resolve(targetDir)) return
+  const preservedRuntimeDir = path.join(os.tmpdir(), `kaigongba-agent-connect-runtime-${process.pid}`)
+  const runtimeDir = path.join(targetDir, '.kaigongba')
+  let preservedRuntime = false
+  try {
+    await fs.rm(preservedRuntimeDir, { recursive: true, force: true })
+    await fs.cp(runtimeDir, preservedRuntimeDir, { recursive: true })
+    preservedRuntime = true
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error
+  }
   await fs.mkdir(path.dirname(targetDir), { recursive: true })
   await fs.rm(targetDir, { recursive: true, force: true })
   await fs.cp(sourceDir, targetDir, {
@@ -33,6 +43,10 @@ async function installSkill(sourceDir, targetDir) {
       return !['.git', '.kaigongba', 'node_modules'].includes(name)
     },
   })
+  if (preservedRuntime) {
+    await fs.cp(preservedRuntimeDir, runtimeDir, { recursive: true, force: true })
+    await fs.rm(preservedRuntimeDir, { recursive: true, force: true })
+  }
 }
 
 await installSkill(packageRoot, installDir)
@@ -69,7 +83,7 @@ const result = {
 if (shouldOnboard) {
   const onboardResult = await runOnboard({
     ...args,
-    'manifest-file': path.join(installDir, 'manifest.json'),
+    'manifest-file': path.join(installDir, 'capabilities-manifest.json'),
     'discovery-file': path.join(installDir, 'discovery.json'),
   })
   process.stdout.write(`${JSON.stringify({ ...result, onboard: onboardResult }, null, 2)}\n`)

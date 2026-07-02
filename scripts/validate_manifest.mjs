@@ -17,7 +17,8 @@ export function validateManifest(manifest) {
   }
 
   const nodes = Array.isArray(manifest?.workflow?.nodes) ? manifest.workflow.nodes : []
-  if (!nodes.length) errors.push('workflow.nodes must contain at least one node')
+  const capabilities = Array.isArray(manifest?.capabilities) ? manifest.capabilities : []
+  if (!nodes.length && !capabilities.length) errors.push('manifest must contain workflow.nodes or capabilities')
 
   const keys = new Set()
   const workerIds = new Set([
@@ -32,6 +33,13 @@ export function validateManifest(manifest) {
     if (node.key) keys.add(node.key)
     if (node.ownerKind === 'external_agent' && node.sourceAgentId && !workerIds.has(node.sourceAgentId)) {
       warnings.push(`workflow.nodes[${index}].sourceAgentId "${node.sourceAgentId}" is not declared in workerAgents`)
+    }
+  })
+
+  capabilities.forEach((capability, index) => {
+    if (!capability.name) errors.push(`capabilities[${index}].name is required`)
+    if (!capability.sourceFingerprint && !capability.sourcePath && !capability.externalId) {
+      warnings.push(`capabilities[${index}] should include sourceFingerprint, sourcePath, or externalId for stable upsert`)
     }
   })
 

@@ -23,6 +23,11 @@ function reviewHtml({ manifest, validation }) {
   const manifestText = JSON.stringify(manifest, null, 2)
   const sourcePaths = Array.isArray(manifest.discoverySummary?.selectedSourcePaths) ? manifest.discoverySummary.selectedSourcePaths : []
   const sourceWarnings = Array.isArray(manifest.discoverySummary?.warnings) ? manifest.discoverySummary.warnings : []
+  const sourceDirs = Array.isArray(manifest.discoverySummary?.sourceDirs) ? manifest.discoverySummary.sourceDirs : []
+  const skillCount = Number(manifest.discoverySummary?.skillCount ?? 0)
+  const workflowCount = Number(manifest.discoverySummary?.workflowCount ?? 0)
+  const caseCount = Number(manifest.discoverySummary?.caseCount ?? 0)
+  const capabilityCount = Array.isArray(manifest.capabilities) ? manifest.capabilities.length : 0
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -49,6 +54,7 @@ function reviewHtml({ manifest, validation }) {
     .warn { color: #b45309; }
     .err { color: #b91c1c; }
     .sources { margin: 10px 0 0; padding-left: 18px; color: #475467; font-size: 12px; line-height: 1.5; }
+    .small { color: #667085; font-size: 12px; line-height: 1.5; }
     pre { white-space: pre-wrap; background: #111827; color: #f9fafb; border-radius: 8px; padding: 12px; overflow: auto; }
   </style>
 </head>
@@ -57,18 +63,20 @@ function reviewHtml({ manifest, validation }) {
   <header>
     <div>
       <h1>确认要上传到开工吧的 Agent 服务</h1>
-      <p>请检查技能名称、SOP 节点、交付物、所需输入、风险边界和真人负责人。确认后会上传为平台服务草稿，不会自动发布市场。</p>
+      <p>请检查技能能力、SOP 节点、交付物、所需输入、风险边界和真人负责人。只有包含真实工作流时才会生成服务 SOP；普通 Skill 会先上传为能力卡片。</p>
     </div>
     <button id="upload" ${validation.ok ? '' : 'disabled'}>${validation.ok ? '确认上传' : '无法上传'}</button>
   </header>
   <div class="grid">
     <section class="panel">
       <div class="metric"><span>服务名称</span><b>${htmlEscape(manifest.serviceCard?.name || '未填写')}</b></div>
-      <div class="metric"><span>SOP 节点</span><b>${manifest.workflow?.nodes?.length || 0}</b></div>
+      <div class="metric"><span>能力 / SOP</span><b>${capabilityCount} 个能力 · ${manifest.workflow?.nodes?.length || 0} 个节点</b></div>
+      <div class="metric"><span>发现来源</span><b>技能 ${skillCount} · 工作流 ${workflowCount} · 案例 ${caseCount}</b></div>
       <div class="metric"><span>交付物</span><b>${htmlEscape((manifest.serviceCard?.deliverables || []).join('、') || '未填写')}</b></div>
       <div class="metric"><span>输入材料</span><b>${htmlEscape((manifest.serviceCard?.requiredInputs || []).join('、') || '未填写')}</b></div>
       <div class="metric"><span>真实来源</span><b>${sourcePaths.length ? `${sourcePaths.length} 个文件` : '未发现'}</b></div>
       <div class="metric"><span>校验</span><b class="${validation.ok ? 'ok' : 'err'}">${validation.ok ? '可上传' : '需要修正'}</b></div>
+      ${sourceDirs.length ? `<p class="small">扫描目录：${htmlEscape(sourceDirs.join('；'))}</p>` : ''}
       ${sourcePaths.length ? `<ul class="sources">${sourcePaths.slice(0, 8).map((item) => `<li>${htmlEscape(item)}</li>`).join('')}${sourcePaths.length > 8 ? `<li>还有 ${sourcePaths.length - 8} 个来源...</li>` : ''}</ul>` : ''}
       ${sourceWarnings.length ? `<p class="warn">${htmlEscape(sourceWarnings.join('；'))}</p>` : ''}
       ${validation.warnings.length ? `<p class="warn">${htmlEscape(validation.warnings.join('；'))}</p>` : ''}

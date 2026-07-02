@@ -1,8 +1,42 @@
 # Manifest Schema
 
-The manifest turns an external main Agent into a draft 开工吧 service card and SOP.
+The manifest has two valid modes:
 
-## Required shape
+- Capability inventory mode: sync local Agent skills as `capabilities[]`; do not create a service SOP yet.
+- Service workflow mode: create a draft 开工吧 service card and SOP from an explicit workflow.
+
+## Capability inventory shape
+
+```json
+{
+  "schemaVersion": "1.0",
+  "mainAgent": {
+    "externalAgentId": "seller_orchestrator",
+    "name": "Seller Orchestrator",
+    "version": "1.0.0",
+    "endpoint": "https://agent.example.com"
+  },
+  "capabilities": [
+    {
+      "externalId": "html_report",
+      "name": "HTML 可视化报告生成",
+      "description": "将资料整理为单文件 HTML 报告。",
+      "capabilityType": "skill",
+      "sourceKind": "skill",
+      "sourcePath": "skills/html-report/SKILL.md",
+      "sourceFingerprint": "skill-html-report-v1",
+      "tags": ["HTML", "报告"],
+      "deliverables": ["单文件 HTML 报告"],
+      "requiredInputs": ["Markdown 文档"],
+      "riskBoundaries": ["不处理未授权的隐私资料"],
+      "acceptanceCriteria": ["报告可在浏览器打开"]
+    }
+  ],
+  "workflow": { "nodes": [] }
+}
+```
+
+## Service workflow shape
 
 ```json
 {
@@ -61,6 +95,8 @@ The manifest turns an external main Agent into a draft 开工吧 service card an
 ## Field rules
 
 - `mainAgent.externalAgentId` must be stable across reconnects.
+- `capabilities[].sourceFingerprint` must be stable across reconnects and updates.
+- Do not expand a list of local skills into `workflow.nodes`. Sync them as `capabilities[]`, then create a service SOP from the selected capability.
 - `workflow.nodes[].key` must be stable. Runtime events use this as `nodeKey`.
 - Use `ownerKind: "human"` for quote, approval, delivery, and final write-back gates.
 - Use `ownerKind: "external_agent"` for worker-agent production nodes.
