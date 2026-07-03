@@ -1,0 +1,154 @@
+{
+  "name": "kaigongba-agent-connect",
+  "version": "0.2.0",
+  "kind": "skill_package",
+  "distribution": {
+    "preferred": "github_npx",
+    "installEntrypoint": "node scripts/install_and_connect.mjs",
+    "updateCheck": "node scripts/update_skill.mjs --check",
+    "update": "node scripts/update_skill.mjs --update",
+    "repair": "node scripts/update_skill.mjs --fill-missing",
+    "verify": "node scripts/validate_skill.mjs",
+    "generatedCapabilityManifest": "capabilities-manifest.json",
+    "generatedDiscovery": "discovery.json",
+    "preserve": [
+      ".kaigongba/",
+      "discovery.json",
+      "capabilities-manifest.json"
+    ],
+    "github": "https://github.com/larrywood0602/kaigongba-agent-connect-skill",
+    "rawBaseUrl": "https://raw.githubusercontent.com/larrywood0602/kaigongba-agent-connect-skill/main/"
+  },
+  "runtime": {
+    "node": ">=20"
+  },
+  "files": {
+    "manifest.json": {
+      "required": true
+    },
+    "SKILL.md": {
+      "required": true,
+      "sha256": "d674d47714103cbafd31799cffe12c98612856075b082fe9ebba3f8f822f9fa4"
+    },
+    "README.md": {
+      "required": true,
+      "sha256": "d16bc81a4a8776db84717d4e2605f46b72957beb1c1e7b79a9016ae9b29f8f0c"
+    },
+    "package.json": {
+      "required": true,
+      "sha256": "942103adbea2217feea8ad27e3170aa8712a26e92834d7226b0646a218be7865"
+    },
+    "agents/openai.yaml": {
+      "required": true,
+      "sha256": "fec8ecb3460653f07b6d6b09cb7dc0b531176057becf665d402ed32f147963dd"
+    },
+    "assets/manifest.example.json": {
+      "required": true,
+      "sha256": "9aa8fbc587c85be3dc15be7986f9d14d850632c3be8d1d1a0520794b1c8a83ee"
+    },
+    "references/api.md": {
+      "required": true,
+      "sha256": "e627a214cababf903067eda0c9f7bae6f60bbf469533edcd0291331ccd7d4d60"
+    },
+    "references/manifest-schema.md": {
+      "required": true,
+      "sha256": "613ba04a515a50d8559aae05fb76257fdca6fb58f878c6ae0045c9cd2b899944"
+    },
+    "references/event-schema.md": {
+      "required": true,
+      "sha256": "239c9cfa4c2fb9195d521af344cbed4ee8201e681c27cf2cde2e3804deda8b63"
+    },
+    "scripts/action_record.mjs": {
+      "required": true,
+      "sha256": "0a58b4f375b3f82fc557a71817d3da6a8e55aae792b913575ecf611c5834fce5"
+    },
+    "scripts/bootstrap_connection.mjs": {
+      "required": true,
+      "sha256": "8333c88696d6c4bcf96da8288aafe07f4addc61368d871cb83734da63f91755a"
+    },
+    "scripts/collect_manifest.mjs": {
+      "required": true,
+      "sha256": "1e7a343153ddd119b7ee3c8006493b6dc77e93dd51ccb667f106463c21ab4a16"
+    },
+    "scripts/create_service_from_capability.mjs": {
+      "required": true,
+      "sha256": "e8b7322ff2d50fe078ca6ecfecbac870f06e8073a1863c586cdf5024f5c27cfb"
+    },
+    "scripts/discover_capabilities.mjs": {
+      "required": true,
+      "sha256": "8dd211b4bcb3933685a4fff79a54b392802e418e1a7a3d14754e1b6ebc65fa03"
+    },
+    "scripts/install_and_connect.mjs": {
+      "required": true,
+      "sha256": "bdcfd066c4eb77db775e5702ad9bdc37641899fe8604090bccb78389e1de1375"
+    },
+    "scripts/lib.mjs": {
+      "required": true,
+      "sha256": "8e4a228dd10543d496524139ed0cd2c3d12fe7e0b4b90ee9550e21a0120d3fe8"
+    },
+    "scripts/list_runs.mjs": {
+      "required": true,
+      "sha256": "cd9368acb472acf81e8d0b5d3c64eec4f9cc1ba8f888717c48a863c8ccb3e200"
+    },
+    "scripts/manifest_from_discovery.mjs": {
+      "required": true,
+      "sha256": "68571b763bcb5c187d66fcaf2f997350c949b6c8e06e060dbe0d99dbeb1fa73a"
+    },
+    "scripts/onboard.mjs": {
+      "required": true,
+      "sha256": "e21a3dd2352d23c1da76f72d4dcde4c5c9dbf6bd091480073f40133159f73960"
+    },
+    "scripts/publish_service.mjs": {
+      "required": true,
+      "sha256": "3df4ea59738e7ee314f97384742af563f13147bbf092100e8f7b455e50adc2f9"
+    },
+    "scripts/readiness.mjs": {
+      "required": true,
+      "sha256": "36790b33f27942f173b7e1b7e9e72d36df0726e6fe03a410bda530ba7b9e918e"
+    },
+    "scripts/refresh_manifest.mjs": {
+      "required": true,
+      "sha256": "6e94bbdcdf5cac96126738691385fb3f994756a3773680673ada19bbe7c1818c"
+    },
+    "scripts/review_manifest_server.mjs": {
+      "required": true,
+      "sha256": "bc0ec5a174a261d39773eddd0e413180937a47a03677f50400985bf1408573d3"
+    },
+    "scripts/runtime_tick.mjs": {
+      "required": true,
+      "sha256": "ff3ad649b482bf8da5a447f83d812af8b057fc61bd2a5041921886acf15172af"
+    },
+    "scripts/sync_capabilities.mjs": {
+      "required": true,
+      "sha256": "81ef46a2fbe732f03b2212a3a54e6d030db57e12b12b75554fdd8a752ef193fd"
+    },
+    "scripts/sync_event.mjs": {
+      "required": true,
+      "sha256": "ffb97a93c55beac89b527d4a274130fbb5f0cb5be95b486c6bbc890fb34986c8"
+    },
+    "scripts/update_skill.mjs": {
+      "required": true,
+      "sha256": "3dfaa45126f27339136b8ab47e1a5412ec309ee1dfd9197fbe655db04085b071"
+    },
+    "scripts/upload_artifact.mjs": {
+      "required": true,
+      "sha256": "7f9271da50c6449c37870a2db8e895a8e52c8763bcd33a84531e0c7eb1c22d62"
+    },
+    "scripts/upload_manifest.mjs": {
+      "required": true,
+      "sha256": "cd4e4f16bb9a14735ceb5148bd2cba6aadb7f8ee982da852b009759ddac85c3d"
+    },
+    "scripts/validate_manifest.mjs": {
+      "required": true,
+      "sha256": "466265e7c0c0a3146c7b0a73720d9f9221d8d9a7cac5101383b335339cec8e55"
+    },
+    "scripts/validate_skill.mjs": {
+      "required": true,
+      "sha256": "3f6abf7df79dce7e8adf74a7719513086bcf046e8a82e746376eaac4e7806209"
+    },
+    "scripts/verify_real_platform.mjs": {
+      "required": true,
+      "sha256": "4600d41e42d91c7f5fdedd8e2de859fb48877d7d5f6b56c3d30151e5d713de89"
+    }
+  }
+}

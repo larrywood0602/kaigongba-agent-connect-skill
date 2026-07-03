@@ -1,4 +1,5 @@
-manifest.json
+capabilities-manifest.json
+discovery.json
 *.local.json
 .env
 .kaigongba/
