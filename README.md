@@ -24,7 +24,7 @@ Or download it into any Agent runtime and execute the bundled Node scripts direc
 ## Connect
 
 ```bash
-npx -y github:larrywood0602/kaigongba-agent-connect-skill#v0.3.0 \
+npx -y github:larrywood0602/kaigongba-agent-connect-skill#v0.3.2 \
   --api-base-url https://api.kaigongba.com \
   --connect-code kgbc_xxx \
   --provider codex \
@@ -48,7 +48,7 @@ If the skill is already installed, run `node scripts/bootstrap_connection.mjs --
 Run the command from the real Agent project directory. If you run it elsewhere, pass the real source explicitly:
 
 ```bash
-npx -y github:larrywood0602/kaigongba-agent-connect-skill#v0.3.0 \
+npx -y github:larrywood0602/kaigongba-agent-connect-skill#v0.3.2 \
   --api-base-url https://api.kaigongba.com \
   --connect-code kgbc_xxx \
   --provider codex \
