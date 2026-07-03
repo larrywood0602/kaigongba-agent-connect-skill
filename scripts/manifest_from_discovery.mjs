@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url'
-import { arg, listArg, parseArgs, readJson, stableKey, writeJson } from './lib.mjs'
+import { arg, listArg, parseArgs, resolveMainAgent, readJson, stableKey, writeJson } from './lib.mjs'
 
 function normalizeList(value, fallback = []) {
   const items = listArg(value)
@@ -102,6 +102,7 @@ export function manifestFromDiscovery(discovery, options = {}) {
 
   const primaryWorkflow = workflows[0]
   const mainAgent = Array.isArray(discovery.agents) && discovery.agents[0] ? discovery.agents[0] : {}
+  const resolvedMainAgent = resolveMainAgent(options, { mainAgent })
   const hasRealSource = skills.length + workflows.length + cases.length > 0
   const capabilityOnly = workflows.length === 0 && skills.length > 0
   const inventoryName = mainAgent.name ? `${mainAgent.name} 能力清单` : '外部 Agent 能力清单'
@@ -146,10 +147,11 @@ export function manifestFromDiscovery(discovery, options = {}) {
   return {
     schemaVersion: '1.0',
     mainAgent: {
-      externalAgentId: String(options.mainAgentId || mainAgent.externalAgentId || 'openclaw_orchestrator'),
-      name: String(options.mainAgentName || mainAgent.name || 'OpenClaw Orchestrator'),
-      version: String(options.mainAgentVersion || '1.0.0'),
-      endpoint: String(options.endpoint || 'openclaw://agent'),
+      provider: resolvedMainAgent.provider,
+      externalAgentId: resolvedMainAgent.externalAgentId,
+      name: resolvedMainAgent.name,
+      version: resolvedMainAgent.version,
+      endpoint: resolvedMainAgent.endpoint,
     },
     workerAgents: [
       ...workerIds.map((id, index) => ({
@@ -228,6 +230,8 @@ async function main() {
     humanBio: arg(args, ['human-bio', 'humanBio']),
     mainAgentId: arg(args, ['main-agent-id', 'mainAgentId']),
     mainAgentName: arg(args, ['main-agent-name', 'mainAgentName']),
+    mainAgentVersion: arg(args, ['main-agent-version', 'mainAgentVersion']),
+    provider: arg(args, 'provider'),
     endpoint: arg(args, 'endpoint'),
   })
   await writeJson(String(arg(args, 'out', 'capabilities-manifest.json')), manifest)

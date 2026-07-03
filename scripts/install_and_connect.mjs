@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { apiRequest, arg, parseArgs, required, writeConnectionConfig } from './lib.mjs'
+import { apiRequest, arg, parseArgs, readConnectionConfig, required, resolveMainAgent, writeConnectionConfig } from './lib.mjs'
 import { runOnboard } from './onboard.mjs'
 
 const args = parseArgs()
@@ -13,14 +13,6 @@ const apiBaseUrl = String(arg(args, ['api-base-url', 'apiBaseUrl'], process.env.
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex')
 const installDir = path.resolve(String(arg(args, ['install-dir', 'installDir'], path.join(codexHome, 'skills', 'kaigongba-agent-connect'))))
-
-const agent = {
-  provider: String(arg(args, 'provider', 'openclaw')),
-  externalAgentId: String(arg(args, ['main-agent-id', 'mainAgentId'], 'openclaw_orchestrator')),
-  name: String(arg(args, ['main-agent-name', 'mainAgentName'], 'OpenClaw Orchestrator')),
-  version: String(arg(args, ['main-agent-version', 'mainAgentVersion'], '1.0.0')),
-  endpoint: String(arg(args, 'endpoint', 'openclaw://agent')),
-}
 
 async function installSkill(sourceDir, targetDir) {
   if (path.resolve(sourceDir) === path.resolve(targetDir)) return
@@ -52,6 +44,7 @@ async function installSkill(sourceDir, targetDir) {
 await installSkill(packageRoot, installDir)
 
 process.env.KAIGONGBA_CONNECTION_CONFIG = path.join(installDir, '.kaigongba/connection.json')
+const agent = resolveMainAgent(args, await readConnectionConfig())
 
 const connectResult = await apiRequest(`${apiBaseUrl}/api/agent-connect/token`, {
   method: 'POST',

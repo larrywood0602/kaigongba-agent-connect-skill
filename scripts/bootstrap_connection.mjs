@@ -1,17 +1,11 @@
 #!/usr/bin/env node
-import { apiRequest, arg, parseArgs, required, writeConnectionConfig } from './lib.mjs'
+import { apiRequest, arg, parseArgs, readConnectionConfig, required, resolveMainAgent, writeConnectionConfig } from './lib.mjs'
 
 const args = parseArgs()
 const connectCode = required(arg(args, ['connect-code', 'connectCode'], process.env.KAIGONGBA_CONNECT_CODE), '--connect-code')
 const apiBaseUrl = String(arg(args, ['api-base-url', 'apiBaseUrl'], process.env.KAIGONGBA_API_BASE_URL || 'http://127.0.0.1:3100')).replace(/\/+$/, '')
 
-const agent = {
-  provider: String(arg(args, 'provider', 'openclaw')),
-  externalAgentId: String(arg(args, ['main-agent-id', 'mainAgentId'], 'openclaw_orchestrator')),
-  name: String(arg(args, ['main-agent-name', 'mainAgentName'], 'OpenClaw Orchestrator')),
-  version: String(arg(args, ['main-agent-version', 'mainAgentVersion'], '1.0.0')),
-  endpoint: String(arg(args, 'endpoint', 'openclaw://agent')),
-}
+const agent = resolveMainAgent(args, await readConnectionConfig())
 
 const result = await apiRequest(`${apiBaseUrl}/api/agent-connect/token`, {
   method: 'POST',

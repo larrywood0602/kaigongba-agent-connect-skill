@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "skill_package",
   "distribution": {
     "preferred": "github_npx",
@@ -28,15 +28,15 @@
     },
     "SKILL.md": {
       "required": true,
-      "sha256": "d674d47714103cbafd31799cffe12c98612856075b082fe9ebba3f8f822f9fa4"
+      "sha256": "a29e0610383dd087561dd0c171ba0717b34fcdd2094e69bee163cedd5b461301"
     },
     "README.md": {
       "required": true,
-      "sha256": "d16bc81a4a8776db84717d4e2605f46b72957beb1c1e7b79a9016ae9b29f8f0c"
+      "sha256": "c4968e3f3146f83753564967e06e8bc12179008bd1346d769df1f3a462908274"
     },
     "package.json": {
       "required": true,
-      "sha256": "942103adbea2217feea8ad27e3170aa8712a26e92834d7226b0646a218be7865"
+      "sha256": "bbd1bb53e6421a5901e8ea1aef899cc71ae863f5860a5b094db2c2e81d863e20"
     },
     "agents/openai.yaml": {
       "required": true,
@@ -48,7 +48,7 @@
     },
     "references/api.md": {
       "required": true,
-      "sha256": "e627a214cababf903067eda0c9f7bae6f60bbf469533edcd0291331ccd7d4d60"
+      "sha256": "987fb2422f5b4b1d74a1fb305763d02f2f8f63de997fccecefb464291b67a763"
     },
     "references/manifest-schema.md": {
       "required": true,
@@ -64,7 +64,7 @@
     },
     "scripts/bootstrap_connection.mjs": {
       "required": true,
-      "sha256": "8333c88696d6c4bcf96da8288aafe07f4addc61368d871cb83734da63f91755a"
+      "sha256": "c5dbeac8659fa0e0653727b559bdbb0e9a9a1c02e7fd58ad95c0f4df91633e51"
     },
     "scripts/collect_manifest.mjs": {
       "required": true,
@@ -76,15 +76,15 @@
     },
     "scripts/discover_capabilities.mjs": {
       "required": true,
-      "sha256": "8dd211b4bcb3933685a4fff79a54b392802e418e1a7a3d14754e1b6ebc65fa03"
+      "sha256": "cb536f4471b8532db1701de2723ab28db32139754ddc1ec2374b5d6b76044964"
     },
     "scripts/install_and_connect.mjs": {
       "required": true,
-      "sha256": "bdcfd066c4eb77db775e5702ad9bdc37641899fe8604090bccb78389e1de1375"
+      "sha256": "d4724fe2c4ee2cbbb4648c7a47ccf5194494c0dd5e22539dff49de98a884183f"
     },
     "scripts/lib.mjs": {
       "required": true,
-      "sha256": "8e4a228dd10543d496524139ed0cd2c3d12fe7e0b4b90ee9550e21a0120d3fe8"
+      "sha256": "7f65a398a277a489f215e6beb11d5f59bbb6a925ebfc6a30e21c6dc85cffe7bd"
     },
     "scripts/list_runs.mjs": {
       "required": true,
@@ -92,7 +92,7 @@
     },
     "scripts/manifest_from_discovery.mjs": {
       "required": true,
-      "sha256": "68571b763bcb5c187d66fcaf2f997350c949b6c8e06e060dbe0d99dbeb1fa73a"
+      "sha256": "723e190024843784d137a45e8424361eee440c9b365c2b24c8d0e74fc21a2c5d"
     },
     "scripts/onboard.mjs": {
       "required": true,
@@ -116,7 +116,7 @@
     },
     "scripts/runtime_tick.mjs": {
       "required": true,
-      "sha256": "ff3ad649b482bf8da5a447f83d812af8b057fc61bd2a5041921886acf15172af"
+      "sha256": "03b161e1d02d190939033b08503e6f4530c198313c9ae85ae918334abf04217a"
     },
     "scripts/sync_capabilities.mjs": {
       "required": true,

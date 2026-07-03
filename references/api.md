@@ -23,6 +23,9 @@ GET  /api/agent-capabilities/:id
 POST /api/agent-capabilities/:id/create-service
 GET  /api/agent-connections/:id
 GET  /api/agent-connections/:id/runs
+GET  /api/agent-connections/:id/work-items
+GET  /api/agent/work-items
+POST /api/agent/work-items/:id/claim
 POST /api/agent-connections/:id/revoke
 GET  /api/service-sops/:id/readiness
 POST /api/service-sops/:id/publish
@@ -41,13 +44,16 @@ POST /api/artifacts/:id/complete
    {
      "connectCode": "kgbc_xxx",
      "agent": {
-       "provider": "openclaw",
-       "externalAgentId": "openclaw_orchestrator",
-       "name": "OpenClaw Orchestrator",
+       "provider": "codex",
+       "externalAgentId": "codex_orchestrator",
+       "name": "Codex Agent",
+       "endpoint": "codex://agent",
        "version": "1.0.0"
      }
    }
    ```
+
+   Replace the provider and Agent fields with the external Agent the user actually connected. The connector must not silently fall back to a fixed provider.
 
 2. Sync discovered skills as capabilities:
    ```bash
@@ -96,11 +102,12 @@ Local development fallback:
 ## Runtime sequence
 
 1. 开工吧 creates or starts an order.
-2. The main Agent calls `GET /api/agent-connections/:id/runs`, `node scripts/runtime_tick.mjs`, or `node scripts/list_runs.mjs --summary` to fetch active order run IDs.
-3. The main Agent reports worker progress with `/events`.
-4. Stage files are reported as `artifact.created` metadata.
-5. Human approval nodes remain gated by platform UI.
-6. Completed/failed/skipped local execution attempts should be recorded with `scripts/action_record.mjs` so retries stay idempotent.
+2. The main Agent calls `GET /api/agent/work-items`, `GET /api/agent-connections/:id/work-items`, or `node scripts/runtime_tick.mjs` to fetch executable work items.
+3. Each work item includes the structured requirement, attachments, deliverables, acceptance criteria, callback event URL, and idempotency key.
+4. The main Agent claims the work item and reports worker progress with `/events`.
+5. Stage files are reported as `artifact.created` metadata.
+6. Human approval nodes remain gated by platform UI.
+7. Completed/failed/skipped local execution attempts should be recorded with `scripts/action_record.mjs` so retries stay idempotent.
 
 ## Auth header
 

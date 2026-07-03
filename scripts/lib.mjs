@@ -48,6 +48,79 @@ export function required(value, name) {
   return String(value).trim()
 }
 
+function compact(value) {
+  if (value === undefined || value === null || value === true) return ''
+  return String(value).trim()
+}
+
+const PROVIDER_AGENT_PRESETS = {
+  codex: {
+    externalAgentId: 'codex_orchestrator',
+    name: 'Codex Agent',
+    endpoint: 'codex://agent',
+  },
+  openclaw: {
+    externalAgentId: 'openclaw_orchestrator',
+    name: 'OpenClaw Orchestrator',
+    endpoint: 'openclaw://agent',
+  },
+}
+
+function providerFromEndpoint(endpoint) {
+  const value = compact(endpoint).toLowerCase()
+  if (!value.includes('://')) return ''
+  return value.split('://')[0]
+}
+
+export function detectAgentProviderFromEnvironment(env = process.env) {
+  if (compact(env.KAIGONGBA_AGENT_PROVIDER)) return compact(env.KAIGONGBA_AGENT_PROVIDER)
+  if (compact(env.CODEX_HOME) || compact(env.CODEX_SESSION_ID) || compact(env.CODEX_ENV_PWD)) return 'codex'
+  return ''
+}
+
+export function resolveMainAgent(args = {}, existingConfig = {}, env = process.env) {
+  const existingAgent = existingConfig.mainAgent && typeof existingConfig.mainAgent === 'object' ? existingConfig.mainAgent : {}
+  const explicitProvider = compact(arg(args, 'provider', env.KAIGONGBA_AGENT_PROVIDER))
+  const existingProvider = compact(existingAgent.provider)
+  const endpointProvider = providerFromEndpoint(arg(args, 'endpoint', existingAgent.endpoint))
+  const detectedProvider = detectAgentProviderFromEnvironment(env)
+  const provider = explicitProvider || existingProvider || endpointProvider || detectedProvider
+
+  if (!provider) {
+    throw new Error(
+      'Unable to determine external Agent identity. Pass --provider plus Agent identity flags, reuse an existing .kaigongba/connection.json, or run inside a detectable Agent runtime.',
+    )
+  }
+
+  const preset = PROVIDER_AGENT_PRESETS[provider.toLowerCase()] ?? {}
+  const externalAgentId = compact(arg(args, ['main-agent-id', 'mainAgentId'], existingAgent.externalAgentId || env.KAIGONGBA_AGENT_ID || preset.externalAgentId))
+  const name = compact(arg(args, ['main-agent-name', 'mainAgentName'], existingAgent.name || env.KAIGONGBA_AGENT_NAME || preset.name))
+  const endpoint = compact(arg(args, 'endpoint', existingAgent.endpoint || env.KAIGONGBA_AGENT_ENDPOINT || preset.endpoint))
+  const version = compact(arg(args, ['main-agent-version', 'mainAgentVersion'], existingAgent.version || env.KAIGONGBA_AGENT_VERSION || '1.0.0'))
+
+  if (!externalAgentId || !name || !endpoint) {
+    throw new Error(
+      'External Agent identity is incomplete. Provide --main-agent-id, --main-agent-name, and --endpoint, or use a known --provider preset.',
+    )
+  }
+
+  return {
+    provider,
+    externalAgentId,
+    name,
+    version,
+    endpoint,
+  }
+}
+
+export function tryResolveMainAgent(args = {}, existingConfig = {}, env = process.env) {
+  try {
+    return resolveMainAgent(args, existingConfig, env)
+  } catch {
+    return null
+  }
+}
+
 export function stableKey(input, fallback = 'node') {
   const normalized = String(input ?? '')
     .trim()

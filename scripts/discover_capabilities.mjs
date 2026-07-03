@@ -3,7 +3,7 @@ import fs from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { arg, listArg, parseArgs, stableKey, writeJson } from './lib.mjs'
+import { arg, listArg, parseArgs, readConnectionConfig, stableKey, tryResolveMainAgent, writeJson } from './lib.mjs'
 
 const SKIP_DIRS = new Set(['.git', '.kaigongba', 'node_modules', 'dist', 'build', '.next', '.cache'])
 const CASE_EXTENSIONS = new Set(['.pdf', '.pptx', '.docx', '.xlsx', '.png', '.jpg', '.jpeg', '.md', '.txt'])
@@ -116,6 +116,7 @@ export async function discoverCapabilities(options = {}) {
   const includeGlobalSkills = options.includeGlobalSkills === true || options.includeGlobalSkills === 'true'
   const sourceDirs = uniquePaths(explicitSources.length ? explicitSources : defaultSourceDirs({ includeGlobalSkills }))
   const includeSelf = options.includeSelf === true || options.includeSelf === 'true'
+  const mainAgent = tryResolveMainAgent(options, await readConnectionConfig())
   const skills = []
   const workflows = []
   const cases = []
@@ -194,19 +195,31 @@ export async function discoverCapabilities(options = {}) {
     workflows,
     cases,
     skipped,
-    warnings: skills.length + workflows.length + cases.length === 0
+    warnings: [
+      ...(skills.length + workflows.length + cases.length === 0
+        ? [
+            '未发现真实 Agent 技能、SOP 或案例。请从你的 Agent 项目目录运行该命令，或传入 --source-dir /path/to/your-agent-project。',
+            '默认只扫描当前 Agent 项目目录，并排除 kaigongba-agent-connect 自身、examples、fixtures 和测试文件，避免上传 demo。',
+          ]
+        : []),
+      ...(mainAgent
+        ? []
+        : [
+            '未识别外部 Agent 身份。请先完成平台连接，或传入 --provider、--main-agent-id、--main-agent-name 和 --endpoint。',
+          ]),
+    ],
+    agents: mainAgent
       ? [
-          '未发现真实 Agent 技能、SOP 或案例。请从你的 Agent 项目目录运行该命令，或传入 --source-dir /path/to/your-agent-project。',
-          '默认只扫描当前 Agent 项目目录，并排除 kaigongba-agent-connect 自身、examples、fixtures 和测试文件，避免上传 demo。',
+          {
+            provider: mainAgent.provider,
+            externalAgentId: mainAgent.externalAgentId,
+            name: mainAgent.name,
+            version: mainAgent.version,
+            endpoint: mainAgent.endpoint,
+            role: 'orchestrator',
+          },
         ]
       : [],
-    agents: [
-      {
-        externalAgentId: String(options.mainAgentId || 'openclaw_orchestrator'),
-        name: String(options.mainAgentName || 'OpenClaw Orchestrator'),
-        role: 'orchestrator',
-      },
-    ],
   }
 }
 
@@ -218,6 +231,9 @@ async function main() {
     maxFiles: arg(args, 'max-files', 300),
     mainAgentId: arg(args, ['main-agent-id', 'mainAgentId']),
     mainAgentName: arg(args, ['main-agent-name', 'mainAgentName']),
+    mainAgentVersion: arg(args, ['main-agent-version', 'mainAgentVersion']),
+    provider: arg(args, 'provider'),
+    endpoint: arg(args, 'endpoint'),
     includeSelf: arg(args, 'include-self', false),
     includeGlobalSkills: arg(args, ['include-global-skills', 'includeGlobalSkills'], false),
   })
