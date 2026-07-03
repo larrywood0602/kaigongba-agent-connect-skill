@@ -14,6 +14,7 @@ const REQUIRED_FILES = [
   'references/api.md',
   'references/manifest-schema.md',
   'references/event-schema.md',
+  'scripts/claim_work_item.mjs',
   'scripts/discover_capabilities.mjs',
   'scripts/manifest_from_discovery.mjs',
   'scripts/sync_capabilities.mjs',

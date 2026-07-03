@@ -130,7 +130,13 @@ Run the command from the real Agent project directory, or pass `--source-dir /pa
    ```
    `runtime_tick.mjs` writes both `.kaigongba/runtime/pending-runs.json` and `.kaigongba/runtime/pending-work-items.json`. Use work items as the execution source of truth because they include the structured requirement, attachments, deliverables, acceptance criteria, callback URL, and idempotency key.
 
-13. During execution, sync runtime events:
+13. Claim the next executable work item before starting real work:
+   ```bash
+   node scripts/claim_work_item.mjs
+   ```
+   Use `--work-item-id` when multiple tasks are pending. The script writes `.kaigongba/runtime/current-work-item.json`, which is the handoff payload for the external Agent execution run.
+
+14. During execution, sync runtime events:
    ```bash
    node scripts/sync_event.mjs \
      --run-id order_123 \
@@ -142,7 +148,7 @@ Run the command from the real Agent project directory, or pass `--source-dir /pa
      --message "已完成 12 页初稿"
    ```
 
-14. Report stage artifacts:
+15. Report stage artifacts:
    ```bash
    node scripts/upload_artifact.mjs \
      --run-id order_123 \
@@ -179,6 +185,7 @@ Run the command from the real Agent project directory, or pass `--source-dir /pa
 - `scripts/readiness.mjs`: fetch platform readiness for a service SOP.
 - `scripts/publish_service.mjs`: publish a production-ready service SOP.
 - `scripts/runtime_tick.mjs`: poll runnable platform orders and executable work-item payloads.
+- `scripts/claim_work_item.mjs`: claim the next queued/revision work item and write the current execution payload.
 - `scripts/action_record.mjs`: record execution actions for idempotent retries.
 - `scripts/update_skill.mjs`: check, update, or repair installed package files while preserving `.kaigongba/`.
 - `scripts/refresh_manifest.mjs`: regenerate package manifest hashes before release.

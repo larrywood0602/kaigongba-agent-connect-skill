@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "skill_package",
   "distribution": {
     "preferred": "github_npx",
@@ -28,15 +28,15 @@
     },
     "SKILL.md": {
       "required": true,
-      "sha256": "a29e0610383dd087561dd0c171ba0717b34fcdd2094e69bee163cedd5b461301"
+      "sha256": "f6b63ae3b45024857861397cba0eac527ead4e6901ca3b6101eea803fc7b8459"
     },
     "README.md": {
       "required": true,
-      "sha256": "c4968e3f3146f83753564967e06e8bc12179008bd1346d769df1f3a462908274"
+      "sha256": "66208989534ef9d64c0b62a6138a295af6ba906e6401c80826666b9aec66fca2"
     },
     "package.json": {
       "required": true,
-      "sha256": "bbd1bb53e6421a5901e8ea1aef899cc71ae863f5860a5b094db2c2e81d863e20"
+      "sha256": "a63540907041d5ed2a0796a87faa152216e91a651593cd4c1987a227f128cdec"
     },
     "agents/openai.yaml": {
       "required": true,
@@ -48,7 +48,7 @@
     },
     "references/api.md": {
       "required": true,
-      "sha256": "987fb2422f5b4b1d74a1fb305763d02f2f8f63de997fccecefb464291b67a763"
+      "sha256": "cc3e0481ea2679e624cd1771e874bed5d9a4de3778cc74832154b83654d89ac1"
     },
     "references/manifest-schema.md": {
       "required": true,
@@ -65,6 +65,10 @@
     "scripts/bootstrap_connection.mjs": {
       "required": true,
       "sha256": "c5dbeac8659fa0e0653727b559bdbb0e9a9a1c02e7fd58ad95c0f4df91633e51"
+    },
+    "scripts/claim_work_item.mjs": {
+      "required": true,
+      "sha256": "706849b7d1aeb5d365b1abce869f32652df2b49e55fc51aa2a4b7566e5fac8a2"
     },
     "scripts/collect_manifest.mjs": {
       "required": true,
@@ -108,7 +112,7 @@
     },
     "scripts/refresh_manifest.mjs": {
       "required": true,
-      "sha256": "6e94bbdcdf5cac96126738691385fb3f994756a3773680673ada19bbe7c1818c"
+      "sha256": "54268eb1e5dcf5900a39fe55b5d5c2316418e5e8e231762f32beb513fa35226c"
     },
     "scripts/review_manifest_server.mjs": {
       "required": true,
@@ -144,7 +148,7 @@
     },
     "scripts/validate_skill.mjs": {
       "required": true,
-      "sha256": "3f6abf7df79dce7e8adf74a7719513086bcf046e8a82e746376eaac4e7806209"
+      "sha256": "3fa6613b9f7a84579e719289218b8b7260510ec5502d3e3ec5f4cc099af4126d"
     },
     "scripts/verify_real_platform.mjs": {
       "required": true,

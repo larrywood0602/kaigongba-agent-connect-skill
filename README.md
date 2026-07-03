@@ -152,6 +152,13 @@ node scripts/list_runs.mjs --summary
 ```
 
 Use the returned `runId`, `serviceSopId`, and node mapping keys when reporting progress and artifacts.
+Before starting real execution, claim the next queued work item:
+
+```bash
+node scripts/claim_work_item.mjs
+```
+
+This writes `.kaigongba/runtime/current-work-item.json`, including the structured requirement, attachments, deliverables, acceptance criteria, callback URL, and idempotency key.
 
 ## Sync Runtime Progress
 

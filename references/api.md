@@ -104,7 +104,7 @@ Local development fallback:
 1. 开工吧 creates or starts an order.
 2. The main Agent calls `GET /api/agent/work-items`, `GET /api/agent-connections/:id/work-items`, or `node scripts/runtime_tick.mjs` to fetch executable work items.
 3. Each work item includes the structured requirement, attachments, deliverables, acceptance criteria, callback event URL, and idempotency key.
-4. The main Agent claims the work item and reports worker progress with `/events`.
+4. The main Agent claims the work item with `POST /api/agent/work-items/:id/claim` or `node scripts/claim_work_item.mjs`, then reports worker progress with `/events`.
 5. Stage files are reported as `artifact.created` metadata.
 6. Human approval nodes remain gated by platform UI.
 7. Completed/failed/skipped local execution attempts should be recorded with `scripts/action_record.mjs` so retries stay idempotent.

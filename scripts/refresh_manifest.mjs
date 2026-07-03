@@ -17,6 +17,7 @@ export const MANIFEST_FILES = [
   'references/event-schema.md',
   'scripts/action_record.mjs',
   'scripts/bootstrap_connection.mjs',
+  'scripts/claim_work_item.mjs',
   'scripts/collect_manifest.mjs',
   'scripts/create_service_from_capability.mjs',
   'scripts/discover_capabilities.mjs',

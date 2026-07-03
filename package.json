@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect-skill",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "bin": {
     "kaigongba-agent-connect-skill": "scripts/install_and_connect.mjs"
@@ -16,6 +16,7 @@
     "references/event-schema.md",
     "scripts/action_record.mjs",
     "scripts/bootstrap_connection.mjs",
+    "scripts/claim_work_item.mjs",
     "scripts/collect_manifest.mjs",
     "scripts/create_service_from_capability.mjs",
     "scripts/discover_capabilities.mjs",
