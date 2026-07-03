@@ -11,10 +11,12 @@ The manifest has two valid modes:
 {
   "schemaVersion": "1.0",
   "mainAgent": {
-    "externalAgentId": "seller_orchestrator",
-    "name": "Seller Orchestrator",
+    "provider": "codex",
+    "externalAgentId": "codex_orchestrator",
+    "name": "Codex Agent",
     "version": "1.0.0",
-    "endpoint": "https://agent.example.com"
+    "endpoint": "codex://agent",
+    "environment": "production"
   },
   "capabilities": [
     {
@@ -42,10 +44,12 @@ The manifest has two valid modes:
 {
   "schemaVersion": "1.0",
   "mainAgent": {
-    "externalAgentId": "seller_orchestrator",
-    "name": "Seller Orchestrator",
+    "provider": "codex",
+    "externalAgentId": "codex_orchestrator",
+    "name": "Codex Agent",
     "version": "1.0.0",
-    "endpoint": "https://agent.example.com"
+    "endpoint": "codex://agent",
+    "environment": "production"
   },
   "workerAgents": [
     {
@@ -95,6 +99,8 @@ The manifest has two valid modes:
 ## Field rules
 
 - `mainAgent.externalAgentId` must be stable across reconnects.
+- `mainAgent.provider` must identify the real external Agent runtime, such as `codex`, `openclaw`, `claude_code`, `cursor`, `http_agent`, or `mcp_agent`. Do not use `custom` or `unknown` for services that should publish to the marketplace.
+- `mainAgent.environment` must be explicit. Use `production` for real business services; `validation`, `staging`, `test`, or `acceptance` connections cannot publish to the official marketplace.
 - `capabilities[].sourceFingerprint` must be stable across reconnects and updates.
 - Do not expand a list of local skills into `workflow.nodes`. Sync them as `capabilities[]`, then create a service SOP from the selected capability.
 - `workflow.nodes[].key` must be stable. Runtime events use this as `nodeKey`.

@@ -22,6 +22,7 @@ const REQUIRED_FILES = [
   'scripts/readiness.mjs',
   'scripts/publish_service.mjs',
   'scripts/runtime_tick.mjs',
+  'scripts/run_work_item.mjs',
   'scripts/action_record.mjs',
   'scripts/update_skill.mjs',
   'scripts/refresh_manifest.mjs',

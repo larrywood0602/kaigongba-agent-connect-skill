@@ -34,6 +34,8 @@ POST /api/workflow-runs/:runId/events
 GET  /api/workflow-runs/:runId/events
 
 POST /api/artifacts/upload-url
+PUT  /api/artifact-uploads/:uploadId
+GET  /api/artifact-uploads/:uploadId/download
 POST /api/artifacts/:id/complete
 ```
 
@@ -41,16 +43,17 @@ POST /api/artifacts/:id/complete
 
 1. Exchange the platform connect code:
    ```json
-   {
-     "connectCode": "kgbc_xxx",
-     "agent": {
-       "provider": "codex",
-       "externalAgentId": "codex_orchestrator",
-       "name": "Codex Agent",
-       "endpoint": "codex://agent",
-       "version": "1.0.0"
-     }
-   }
+	   {
+	     "connectCode": "kgbc_xxx",
+	     "agent": {
+	       "provider": "codex",
+	       "externalAgentId": "codex_orchestrator",
+	       "name": "Codex Agent",
+	       "endpoint": "codex://agent",
+	       "version": "1.0.0",
+	       "environment": "production"
+	     }
+	   }
    ```
 
    Replace the provider and Agent fields with the external Agent the user actually connected. The connector must not silently fall back to a fixed provider.
@@ -82,10 +85,12 @@ Local development fallback:
    ```json
    {
      "mainAgent": {
-       "externalAgentId": "seller_orchestrator",
-       "name": "Seller Orchestrator",
+       "provider": "codex",
+       "externalAgentId": "codex_orchestrator",
+       "name": "Codex Agent",
        "version": "1.0.0",
-       "endpoint": "https://agent.example.com"
+       "endpoint": "codex://agent",
+       "environment": "production"
      }
    }
    ```
@@ -104,8 +109,8 @@ Local development fallback:
 1. 开工吧 creates or starts an order.
 2. The main Agent calls `GET /api/agent/work-items`, `GET /api/agent-connections/:id/work-items`, or `node scripts/runtime_tick.mjs` to fetch executable work items.
 3. Each work item includes the structured requirement, attachments, deliverables, acceptance criteria, callback event URL, and idempotency key.
-4. The main Agent claims the work item with `POST /api/agent/work-items/:id/claim` or `node scripts/claim_work_item.mjs`, then reports worker progress with `/events`.
-5. Stage files are reported as `artifact.created` metadata.
+4. The main Agent claims the work item with `POST /api/agent/work-items/:id/claim`, `node scripts/claim_work_item.mjs`, or `node scripts/run_work_item.mjs`, then reports worker progress with `/events`.
+5. Stage files are reported as `artifact.created` metadata. `scripts/run_work_item.mjs` and `scripts/upload_artifact.mjs` can upload a local `file` to the platform `uploadUrl`, store the downloadable `externalUrl`, and mark the artifact complete. Upload/download URLs are signed; preserve the full URL including query parameters.
 6. Human approval nodes remain gated by platform UI.
 7. Completed/failed/skipped local execution attempts should be recorded with `scripts/action_record.mjs` so retries stay idempotent.
 

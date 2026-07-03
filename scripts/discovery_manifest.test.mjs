@@ -47,7 +47,7 @@ describe('kaigongba agent capability discovery', () => {
       schemaVersion: '1.0',
       sourceDirs: [tempDir],
       warnings: [],
-      agents: [{ provider: 'custom', externalAgentId: 'seller_orchestrator', name: 'Seller Orchestrator', endpoint: 'seller://agent' }],
+      agents: [{ provider: 'codex', externalAgentId: 'codex_orchestrator', name: 'Codex Agent', endpoint: 'codex://agent' }],
       skills: [
         { id: 'skill_design', name: 'design', title: 'Design Skill', description: '生成视觉方案', sourcePath: join(tempDir, 'design/SKILL.md') },
         { id: 'skill_copy', name: 'copy', title: 'Copy Skill', description: '生成文案', sourcePath: join(tempDir, 'copy/SKILL.md') },
@@ -69,7 +69,7 @@ describe('kaigongba agent capability discovery', () => {
       schemaVersion: '1.0',
       sourceDirs: [tempDir],
       warnings: [],
-      agents: [{ provider: 'custom', externalAgentId: 'seller_orchestrator', name: 'Seller Orchestrator', endpoint: 'seller://agent' }],
+      agents: [{ provider: 'codex', externalAgentId: 'codex_orchestrator', name: 'Codex Agent', endpoint: 'codex://agent' }],
       skills: [
         { id: 'skill_design', name: 'design', title: 'Design Skill', description: '生成视觉方案', sourcePath: join(tempDir, 'design/SKILL.md') },
         { id: 'skill_copy', name: 'copy', title: 'Copy Skill', description: '生成文案', sourcePath: join(tempDir, 'copy/SKILL.md') },
@@ -80,7 +80,7 @@ describe('kaigongba agent capability discovery', () => {
 
     const manifest = manifestFromDiscovery(discovery)
 
-    expect(manifest.serviceCard.name).toBe('Seller Orchestrator 能力清单')
+    expect(manifest.serviceCard.name).toBe('Codex Agent 能力清单')
     expect(manifest.serviceCard.tagline).toBe('同步外部 Agent 技能为平台能力，等待选择后创建可接单服务 SOP')
     expect(manifest.workflow.nodes).toEqual([])
   })
@@ -94,6 +94,7 @@ describe('kaigongba agent capability discovery', () => {
       externalAgentId: 'codex_orchestrator',
       name: 'Codex Agent',
       endpoint: 'codex://agent',
+      environment: 'production',
     })
 
     const discovery = await discoverCapabilities({ maxDepth: 1, maxFiles: 5 })

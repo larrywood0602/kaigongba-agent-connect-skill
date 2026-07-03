@@ -1,10 +1,12 @@
 {
   "schemaVersion": "1.0",
   "mainAgent": {
-    "externalAgentId": "seller_orchestrator",
-    "name": "Seller Orchestrator",
+    "provider": "codex",
+    "externalAgentId": "codex_orchestrator",
+    "name": "Codex Agent",
     "version": "1.0.0",
-    "endpoint": "https://agent.example.com"
+    "endpoint": "codex://agent",
+    "environment": "production"
   },
   "workerAgents": [
     {

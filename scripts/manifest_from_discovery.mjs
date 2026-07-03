@@ -152,6 +152,7 @@ export function manifestFromDiscovery(discovery, options = {}) {
       name: resolvedMainAgent.name,
       version: resolvedMainAgent.version,
       endpoint: resolvedMainAgent.endpoint,
+      environment: resolvedMainAgent.environment,
     },
     workerAgents: [
       ...workerIds.map((id, index) => ({
@@ -233,6 +234,7 @@ async function main() {
     mainAgentVersion: arg(args, ['main-agent-version', 'mainAgentVersion']),
     provider: arg(args, 'provider'),
     endpoint: arg(args, 'endpoint'),
+    environment: arg(args, 'environment'),
   })
   await writeJson(String(arg(args, 'out', 'capabilities-manifest.json')), manifest)
 }

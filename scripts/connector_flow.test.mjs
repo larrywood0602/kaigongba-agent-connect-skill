@@ -7,6 +7,7 @@ import { recordAction } from './action_record.mjs'
 import { createServiceFromCapability } from './create_service_from_capability.mjs'
 import { publishService } from './publish_service.mjs'
 import { getServiceReadiness } from './readiness.mjs'
+import { runWorkItem } from './run_work_item.mjs'
 import { runRuntimeTick } from './runtime_tick.mjs'
 import { syncCapabilitiesFromFile } from './sync_capabilities.mjs'
 
@@ -26,7 +27,12 @@ async function readBody(req) {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
   const raw = Buffer.concat(chunks).toString('utf8')
-  return raw ? JSON.parse(raw) : {}
+  if (!raw) return {}
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return raw
+  }
 }
 
 async function startMockServer() {
@@ -71,10 +77,68 @@ async function startMockServer() {
             serviceSopId: 'sop_html',
             nodeKey: 'external_agent_execution',
             status: 'queued',
-            payload: { requirement: { goal: '生成 HTML 报告' } },
+            payload: {
+              requirement: { goal: '生成 HTML 报告' },
+              callback: {
+                runId: 'order_mock_1',
+                connectionId: 'conn_mock',
+                serviceSopId: 'sop_html',
+                nodeKey: 'external_agent_execution',
+              },
+              idempotencyKey: 'order_mock_1-external_agent_execution-initial',
+            },
           },
         ],
       })
+      return
+    }
+    if (req.url === '/api/agent/work-items/work_mock_1/claim' && req.method === 'POST') {
+      jsonResponse(res, {
+        workItem: {
+          id: 'work_mock_1',
+          connectionId: 'conn_mock',
+          orderId: 'order_mock_1',
+          serviceSopId: 'sop_html',
+          nodeKey: 'external_agent_execution',
+          status: 'claimed',
+          payload: {
+            requirement: { goal: '生成 HTML 报告' },
+            callback: {
+              runId: 'order_mock_1',
+              connectionId: 'conn_mock',
+              serviceSopId: 'sop_html',
+              nodeKey: 'external_agent_execution',
+            },
+            idempotencyKey: 'order_mock_1-external_agent_execution-initial',
+          },
+        },
+      })
+      return
+    }
+    if (req.url === '/api/workflow-runs/order_mock_1/events' && req.method === 'POST') {
+      jsonResponse(res, {
+        event: { id: `event_${requests.length}`, ...body },
+        artifact: body.event === 'artifact.created' ? { id: 'art_mock_1', ...body.artifact } : null,
+        duplicate: false,
+      })
+      return
+    }
+    if (req.url === '/api/artifacts/upload-url' && req.method === 'POST') {
+      jsonResponse(res, {
+        uploadId: 'upload_mock_1',
+        uploadUrl: `http://${req.headers.host}/upload/report.md`,
+        externalUrl: `http://${req.headers.host}/download/report.md`,
+        expiresInSeconds: 900,
+      })
+      return
+    }
+    if (req.url === '/upload/report.md' && req.method === 'PUT') {
+      res.writeHead(200, { 'Content-Type': 'text/plain' })
+      res.end('ok')
+      return
+    }
+    if (req.url === '/api/artifacts/art_mock_1/complete' && req.method === 'POST') {
+      jsonResponse(res, { artifact: { id: 'art_mock_1', status: 'uploaded' } })
       return
     }
 
@@ -152,6 +216,14 @@ describe('kaigongba connector capability-first scripts', () => {
   })
 
   it('creates, checks, publishes, ticks, and records actions using mock state only', async () => {
+    const executorFile = join(tempDir, 'executor.mjs')
+    const outputFile = join(tempDir, 'report.md')
+    await writeFile(outputFile, '# Mock report\n', 'utf8')
+    await writeFile(
+      executorFile,
+      `let raw = ''\nprocess.stdin.on('data', (chunk) => { raw += chunk })\nprocess.stdin.on('end', () => {\n  console.log(JSON.stringify({\n    progressEvents: [{ progress: 72, message: 'mock executor progressing' }],\n    artifacts: [{ name: 'report.md', type: 'md', file: ${JSON.stringify(outputFile)} }],\n    finalMessage: 'mock executor completed'\n  }))\n})\n`,
+      'utf8',
+    )
     const created = await createServiceFromCapability('cap_html', {
       serviceName: 'HTML 可视化报告服务',
       priceCents: 180000,
@@ -161,6 +233,7 @@ describe('kaigongba connector capability-first scripts', () => {
     const readiness = await getServiceReadiness('sop_html')
     const published = await publishService('sop_html')
     const tick = await runRuntimeTick({ outputDir: join(tempDir, '.kaigongba/runtime') })
+    const run = await runWorkItem({ outputDir: join(tempDir, '.kaigongba/runtime'), executorCommand: `node "${executorFile}"` })
     const action = await recordAction({
       action: 'deliver_run',
       targetId: 'order_mock_1',
@@ -176,13 +249,30 @@ describe('kaigongba connector capability-first scripts', () => {
     expect(published.serviceSop.status).toBe('published')
     expect(tick.pendingRuns).toHaveLength(1)
     expect(tick.pendingWorkItems).toHaveLength(1)
+    expect(run.ok).toBe(true)
+    expect(requests.some((request) => request.url === '/api/agent/work-items/work_mock_1/claim')).toBe(true)
+    expect(requests.filter((request) => request.url === '/api/workflow-runs/order_mock_1/events').map((request) => request.body.event)).toEqual([
+      'node.started',
+      'node.progress',
+      'artifact.created',
+      'node.completed',
+    ])
+    expect(requests.find((request) => request.body?.event === 'artifact.created')?.body.artifact).toMatchObject({
+      externalUrl: expect.stringContaining('/download/report.md'),
+      uploadId: 'upload_mock_1',
+    })
+    expect(requests.some((request) => request.method === 'PUT' && request.url === '/upload/report.md' && request.body === '# Mock report\n')).toBe(true)
+    expect(requests.some((request) => request.method === 'POST' && request.url === '/api/artifacts/art_mock_1/complete')).toBe(true)
     expect(action.status).toBe('done')
 
     const pending = JSON.parse(await readFile(join(tempDir, '.kaigongba/runtime/pending-runs.json'), 'utf8'))
     const pendingWorkItems = JSON.parse(await readFile(join(tempDir, '.kaigongba/runtime/pending-work-items.json'), 'utf8'))
     const actions = JSON.parse(await readFile(join(tempDir, '.kaigongba/runtime/actions.json'), 'utf8'))
+    const runResult = JSON.parse(await readFile(join(tempDir, '.kaigongba/runtime/last-run-result.json'), 'utf8'))
     expect(pending[0].runId).toBe('order_mock_1')
     expect(pendingWorkItems[0]).toMatchObject({ id: 'work_mock_1', orderId: 'order_mock_1', payload: { requirement: { goal: '生成 HTML 报告' } } })
+    expect(runResult.ok).toBe(true)
+    expect(runResult.artifacts[0]).toMatchObject({ upload: { uploaded: true }, completed: { artifact: { status: 'uploaded' } } })
     expect(actions.actions['deliver-order_mock_1']).toMatchObject({ status: 'done', idempotency_key: 'deliver-order_mock_1' })
   })
 })

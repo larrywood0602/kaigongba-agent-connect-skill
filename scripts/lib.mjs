@@ -97,6 +97,7 @@ export function resolveMainAgent(args = {}, existingConfig = {}, env = process.e
   const name = compact(arg(args, ['main-agent-name', 'mainAgentName'], existingAgent.name || env.KAIGONGBA_AGENT_NAME || preset.name))
   const endpoint = compact(arg(args, 'endpoint', existingAgent.endpoint || env.KAIGONGBA_AGENT_ENDPOINT || preset.endpoint))
   const version = compact(arg(args, ['main-agent-version', 'mainAgentVersion'], existingAgent.version || env.KAIGONGBA_AGENT_VERSION || '1.0.0'))
+  const environment = normalizeAgentEnvironment(arg(args, 'environment', existingAgent.environment || env.KAIGONGBA_AGENT_ENVIRONMENT || 'production'))
 
   if (!externalAgentId || !name || !endpoint) {
     throw new Error(
@@ -110,7 +111,16 @@ export function resolveMainAgent(args = {}, existingConfig = {}, env = process.e
     name,
     version,
     endpoint,
+    environment,
   }
+}
+
+export function normalizeAgentEnvironment(value, fallback = 'production') {
+  const raw = compact(value).toLowerCase().replace(/\s+/g, '_')
+  if (!raw) return fallback
+  if (['prod', 'production', '正式', '正式环境'].includes(raw)) return 'production'
+  if (['validation', 'staging', 'test', 'testing', 'e2e', 'acceptance', '验收', '测试', '验收环境', '测试环境'].includes(raw)) return 'validation'
+  return raw
 }
 
 export function tryResolveMainAgent(args = {}, existingConfig = {}, env = process.env) {
@@ -196,6 +206,24 @@ export async function apiRequest(apiPath, options = {}) {
     throw new Error(`${response.status} ${code}: ${message}`)
   }
   return payload
+}
+
+export async function uploadFileToUrl({ filePath, uploadUrl, mimeType }) {
+  if (!filePath) return { uploaded: false, skippedReason: 'no_file' }
+  if (!uploadUrl || !String(uploadUrl).startsWith('http')) {
+    return { uploaded: false, skippedReason: 'non_http_upload_url', uploadUrl }
+  }
+  const bytes = await fs.readFile(filePath)
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: mimeType ? { 'Content-Type': mimeType } : {},
+    body: bytes,
+  })
+  if (!response.ok) {
+    const raw = await response.text()
+    throw new Error(`Artifact upload failed: HTTP ${response.status} ${raw || response.statusText}`)
+  }
+  return { uploaded: true, status: response.status, uploadUrl }
 }
 
 export function defaultStatus(eventType) {

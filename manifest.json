@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "kind": "skill_package",
   "distribution": {
     "preferred": "github_npx",
@@ -28,15 +28,15 @@
     },
     "SKILL.md": {
       "required": true,
-      "sha256": "d4cd932e3665c74add57fd4b37504f6ad28fa84f41a3b105d02e65f26609d97a"
+      "sha256": "a8c60d4ccc745ef3fb92b32e825ffa9a179083aa01fe3e50cee785f4a9a4c0a1"
     },
     "README.md": {
       "required": true,
-      "sha256": "49902a844ea3698c705486920609633afc76ee558a57a2da0c100a644b794a71"
+      "sha256": "c8c65204e4f9c126cfc229499d855b01e36cd081b30796774e1bad302b858dc8"
     },
     "package.json": {
       "required": true,
-      "sha256": "bbb5175ff83a874f8c31427b3812ebdef8070c15cc4b54c801a376ac3241130e"
+      "sha256": "0a35cd6d418392b868dce384ee4a432464fb40128003450dcb210baae1210b89"
     },
     "agents/openai.yaml": {
       "required": true,
@@ -44,15 +44,15 @@
     },
     "assets/manifest.example.json": {
       "required": true,
-      "sha256": "9aa8fbc587c85be3dc15be7986f9d14d850632c3be8d1d1a0520794b1c8a83ee"
+      "sha256": "eb3cc86a7c6a94ffa4e9cae6e7fdf9a984ff6ffd9f6cfc29d066903acace331b"
     },
     "references/api.md": {
       "required": true,
-      "sha256": "cc3e0481ea2679e624cd1771e874bed5d9a4de3778cc74832154b83654d89ac1"
+      "sha256": "a5e478a84f49717cb86154f62a52dc6b192ddc6ce238794c7459cd133810c712"
     },
     "references/manifest-schema.md": {
       "required": true,
-      "sha256": "613ba04a515a50d8559aae05fb76257fdca6fb58f878c6ae0045c9cd2b899944"
+      "sha256": "883290d765576c23eaa01dbeacda0904691396df53095785b0b0e5d5c7b28ee8"
     },
     "references/event-schema.md": {
       "required": true,
@@ -72,7 +72,7 @@
     },
     "scripts/collect_manifest.mjs": {
       "required": true,
-      "sha256": "1e7a343153ddd119b7ee3c8006493b6dc77e93dd51ccb667f106463c21ab4a16"
+      "sha256": "f06b1cb9352092d292271dda5391c30a08e016947b3800797ecd289b1dfaf911"
     },
     "scripts/create_service_from_capability.mjs": {
       "required": true,
@@ -80,7 +80,7 @@
     },
     "scripts/discover_capabilities.mjs": {
       "required": true,
-      "sha256": "cb536f4471b8532db1701de2723ab28db32139754ddc1ec2374b5d6b76044964"
+      "sha256": "8f871ed0ba6c52aa37f50c7f73fa2bfa670cf7615d98c2201aa1e9898f31b7d3"
     },
     "scripts/install_and_connect.mjs": {
       "required": true,
@@ -88,7 +88,7 @@
     },
     "scripts/lib.mjs": {
       "required": true,
-      "sha256": "7f65a398a277a489f215e6beb11d5f59bbb6a925ebfc6a30e21c6dc85cffe7bd"
+      "sha256": "1ca81db53e80d97a72408ac74f3e5dbfec2c2e4589b946a4734bcb05b04bcc1e"
     },
     "scripts/list_runs.mjs": {
       "required": true,
@@ -96,11 +96,11 @@
     },
     "scripts/manifest_from_discovery.mjs": {
       "required": true,
-      "sha256": "723e190024843784d137a45e8424361eee440c9b365c2b24c8d0e74fc21a2c5d"
+      "sha256": "f2079f95701d6d10776c9cff93a2a01fb91f7cfcf41ab3ee653e8cf4d54bb37a"
     },
     "scripts/onboard.mjs": {
       "required": true,
-      "sha256": "e21a3dd2352d23c1da76f72d4dcde4c5c9dbf6bd091480073f40133159f73960"
+      "sha256": "e200ab842160c055049286b27a39f27e5a29eb0ba1f104fdf7c422e0653745c9"
     },
     "scripts/publish_service.mjs": {
       "required": true,
@@ -112,11 +112,15 @@
     },
     "scripts/refresh_manifest.mjs": {
       "required": true,
-      "sha256": "54268eb1e5dcf5900a39fe55b5d5c2316418e5e8e231762f32beb513fa35226c"
+      "sha256": "3f7b05d87f975407883ced339c2c571de49022aa56d5d98b50644c69b79b3ea5"
     },
     "scripts/review_manifest_server.mjs": {
       "required": true,
       "sha256": "bc0ec5a174a261d39773eddd0e413180937a47a03677f50400985bf1408573d3"
+    },
+    "scripts/run_work_item.mjs": {
+      "required": true,
+      "sha256": "5d5e8a89141c8a7d5aa42683fd489351fa9aa103c7f164cfdd7485dd1dd1db19"
     },
     "scripts/runtime_tick.mjs": {
       "required": true,
@@ -136,7 +140,7 @@
     },
     "scripts/upload_artifact.mjs": {
       "required": true,
-      "sha256": "7f9271da50c6449c37870a2db8e895a8e52c8763bcd33a84531e0c7eb1c22d62"
+      "sha256": "6525bbe19f4b0495d8dd6efc0e4189ef8def09d494c742d5c9326f5fde27de4d"
     },
     "scripts/upload_manifest.mjs": {
       "required": true,
@@ -148,7 +152,7 @@
     },
     "scripts/validate_skill.mjs": {
       "required": true,
-      "sha256": "3fa6613b9f7a84579e719289218b8b7260510ec5502d3e3ec5f4cc099af4126d"
+      "sha256": "25ba6097c6f402fe2ffa84ed688adf91e7581950bb386a731957d12541a274a0"
     },
     "scripts/verify_real_platform.mjs": {
       "required": true,

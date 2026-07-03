@@ -30,6 +30,7 @@ export const MANIFEST_FILES = [
   'scripts/readiness.mjs',
   'scripts/refresh_manifest.mjs',
   'scripts/review_manifest_server.mjs',
+  'scripts/run_work_item.mjs',
   'scripts/runtime_tick.mjs',
   'scripts/sync_capabilities.mjs',
   'scripts/sync_event.mjs',

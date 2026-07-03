@@ -216,6 +216,7 @@ export async function discoverCapabilities(options = {}) {
             name: mainAgent.name,
             version: mainAgent.version,
             endpoint: mainAgent.endpoint,
+            environment: mainAgent.environment,
             role: 'orchestrator',
           },
         ]
@@ -234,6 +235,7 @@ async function main() {
     mainAgentVersion: arg(args, ['main-agent-version', 'mainAgentVersion']),
     provider: arg(args, 'provider'),
     endpoint: arg(args, 'endpoint'),
+    environment: arg(args, 'environment'),
     includeSelf: arg(args, 'include-self', false),
     includeGlobalSkills: arg(args, ['include-global-skills', 'includeGlobalSkills'], false),
   })

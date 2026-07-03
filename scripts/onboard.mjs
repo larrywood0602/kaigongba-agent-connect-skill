@@ -17,7 +17,11 @@ export async function runOnboard(args = {}) {
     maxFiles: arg(args, 'max-files', 300),
     mainAgentId: arg(args, ['main-agent-id', 'mainAgentId']),
     mainAgentName: arg(args, ['main-agent-name', 'mainAgentName']),
+    mainAgentVersion: arg(args, ['main-agent-version', 'mainAgentVersion']),
+    provider: arg(args, 'provider'),
     includeGlobalSkills: arg(args, ['include-global-skills', 'includeGlobalSkills'], false),
+    endpoint: arg(args, 'endpoint'),
+    environment: arg(args, 'environment'),
   })
   await writeJson(discoveryFile, discovery)
 
@@ -38,7 +42,10 @@ export async function runOnboard(args = {}) {
     humanBio: arg(args, ['human-bio', 'humanBio']),
     mainAgentId: arg(args, ['main-agent-id', 'mainAgentId']),
     mainAgentName: arg(args, ['main-agent-name', 'mainAgentName']),
+    mainAgentVersion: arg(args, ['main-agent-version', 'mainAgentVersion']),
+    provider: arg(args, 'provider'),
     endpoint: arg(args, 'endpoint'),
+    environment: arg(args, 'environment'),
   })
   await writeJson(manifestFile, manifest)
 

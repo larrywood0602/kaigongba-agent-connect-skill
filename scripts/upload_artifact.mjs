@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { apiRequest, arg, mimeFromName, numberArg, parseArgs, readConnectionConfig, required } from './lib.mjs'
+import { apiRequest, arg, mimeFromName, numberArg, parseArgs, readConnectionConfig, required, uploadFileToUrl } from './lib.mjs'
 
 const args = parseArgs()
 const config = await readConnectionConfig()
@@ -28,7 +28,9 @@ const externalArtifactId = String(arg(args, ['external-artifact-id', 'externalAr
 
 let externalUrl = arg(args, ['external-url', 'externalUrl'])
 let uploadId = arg(args, ['upload-id', 'uploadId'])
-if (!externalUrl && !uploadId) {
+let uploadUrl = ''
+const shouldRequestUpload = Boolean(!externalUrl && !uploadId)
+if (shouldRequestUpload) {
   const upload = await apiRequest('/api/artifacts/upload-url', {
     method: 'POST',
     body: JSON.stringify({
@@ -41,9 +43,14 @@ if (!externalUrl && !uploadId) {
       sizeBytes,
     }),
   })
-  externalUrl = upload.uploadUrl
+  uploadUrl = upload.uploadUrl
+  externalUrl = upload.externalUrl || upload.downloadUrl || upload.uploadUrl
   uploadId = upload.uploadId
 }
+
+const uploadResult = shouldRequestUpload
+  ? await uploadFileToUrl({ filePath, uploadUrl: uploadUrl || externalUrl, mimeType })
+  : { uploaded: false, skippedReason: filePath ? 'external_artifact_url_provided' : 'no_file' }
 
 const payload = {
   connectionId: arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId),
@@ -84,4 +91,12 @@ const result = await apiRequest(`/api/workflow-runs/${encodeURIComponent(runId)}
   body: JSON.stringify(payload),
 })
 
-process.stdout.write(`${JSON.stringify({ ...result, artifact: payload.artifact }, null, 2)}\n`)
+let completed = null
+if (uploadResult.uploaded && result.artifact?.id) {
+  completed = await apiRequest(`/api/artifacts/${encodeURIComponent(result.artifact.id)}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ uploadId, uploaded: true, uploadStatus: uploadResult.status }),
+  })
+}
+
+process.stdout.write(`${JSON.stringify({ ...result, artifact: result.artifact || payload.artifact, upload: uploadResult, completed }, null, 2)}\n`)

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { arg, listArg, parseArgs, stableKey, writeJson } from './lib.mjs'
+import { arg, listArg, normalizeAgentEnvironment, parseArgs, readConnectionConfig, resolveMainAgent, stableKey, writeJson } from './lib.mjs'
 
 const args = parseArgs()
 
 const serviceName = String(arg(args, ['service-name', 'serviceName'], '外部 Agent 服务 SOP'))
 const serviceKey = stableKey(serviceName, 'external_agent_service')
+const resolvedMainAgent = resolveMainAgent(args, await readConnectionConfig())
 const workerId = String(arg(args, ['worker-id', 'workerId'], `${serviceKey}_worker`))
 const workerName = String(arg(args, ['worker-name', 'workerName'], 'Production Worker Agent'))
 const externalNodeKey = String(arg(args, ['node-key', 'nodeKey'], 'external_agent_execution'))
@@ -19,10 +20,12 @@ const artifactTypes = listArg(arg(args, ['artifact-types', 'artifactTypes']), ['
 const manifest = {
   schemaVersion: '1.0',
   mainAgent: {
-    externalAgentId: String(arg(args, ['main-agent-id', 'mainAgentId'], `${serviceKey}_orchestrator`)),
-    name: String(arg(args, ['main-agent-name', 'mainAgentName'], 'Seller Orchestrator')),
-    version: String(arg(args, ['main-agent-version', 'mainAgentVersion'], '1.0.0')),
-    endpoint: String(arg(args, ['endpoint', 'main-agent-endpoint', 'mainAgentEndpoint'], 'https://agent.example.com')),
+    provider: resolvedMainAgent.provider,
+    externalAgentId: resolvedMainAgent.externalAgentId,
+    name: resolvedMainAgent.name,
+    version: resolvedMainAgent.version,
+    endpoint: resolvedMainAgent.endpoint,
+    environment: normalizeAgentEnvironment(arg(args, 'environment', 'production')),
   },
   workerAgents: [
     {

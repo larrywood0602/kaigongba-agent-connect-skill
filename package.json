@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect-skill",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "bin": {
     "kaigongba-agent-connect-skill": "scripts/install_and_connect.mjs"
@@ -29,6 +29,7 @@
     "scripts/readiness.mjs",
     "scripts/refresh_manifest.mjs",
     "scripts/review_manifest_server.mjs",
+    "scripts/run_work_item.mjs",
     "scripts/runtime_tick.mjs",
     "scripts/sync_capabilities.mjs",
     "scripts/sync_event.mjs",
