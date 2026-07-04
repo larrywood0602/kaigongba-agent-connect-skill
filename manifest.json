@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "kind": "skill_package",
   "distribution": {
     "preferred": "github_npx",
@@ -28,15 +28,15 @@
     },
     "SKILL.md": {
       "required": true,
-      "sha256": "6f49fb0bb5c9376d42fff8f1492aa96d44ceb4212bbcffcd459bd6a5d3c32342"
+      "sha256": "f26693e84fc7d6cd546e01bb606100a9423482227b22e89b9782e8927faa41ac"
     },
     "README.md": {
       "required": true,
-      "sha256": "fd1211a8139b5eec4d49b19d1a0a4efe54c7775373bbec6dd146c6be0596308c"
+      "sha256": "eb81cce79e9924497fcabec554da4b7fdb2535a6540a1711de28030207e8474d"
     },
     "package.json": {
       "required": true,
-      "sha256": "938fc35ccd8fa6385ffd143ef265c11d5b5fcb8d5ea5c494d744645954ce8dc7"
+      "sha256": "1fd18882631b4f7ca2fd182efd07acfacde9eb50ee7636e24120e83281ecccd0"
     },
     "agents/openai.yaml": {
       "required": true,
@@ -128,11 +128,11 @@
     },
     "scripts/run_work_item.mjs": {
       "required": true,
-      "sha256": "cfdca7624e268b11c404d8b8e67215577195246e941c83d5a9708fa51658e4f1"
+      "sha256": "919dcffab1648a6c2cd5f46688603d382bb621023d1832d58f766c1c2994f975"
     },
     "scripts/start_worker.mjs": {
       "required": true,
-      "sha256": "4671947c87621fd88666a4a8a9dabc2eb8a6df9cc1c6607c7a42a3e07846eae9"
+      "sha256": "c246cc550800e64f0e6cd14b0dff267342f83dbb7c73d9bad4920664ee0c7d6d"
     },
     "scripts/runtime_tick.mjs": {
       "required": true,
@@ -172,7 +172,7 @@
     },
     "scripts/worker_daemon.mjs": {
       "required": true,
-      "sha256": "4c0cbf94988fbbd12947e0cc2fa8e9e66d5c17f1d96966e11ad0241f48362aa9"
+      "sha256": "8e641bae9087022a02ade32e240b49b387e577e0298cc5a2710455c93427cefe"
     }
   }
 }

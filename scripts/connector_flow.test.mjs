@@ -18,6 +18,48 @@ let server
 let baseUrl
 let requests
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isProcessRunning(pid) {
+  if (!pid) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function readPidFile(file) {
+  try {
+    const raw = await readFile(file, 'utf8')
+    const pid = Number(raw.trim())
+    return Number.isInteger(pid) && pid > 0 ? pid : null
+  } catch {
+    return null
+  }
+}
+
+async function waitForProcessExit(pid, timeoutMs = 1000) {
+  const deadline = Date.now() + timeoutMs
+  while (isProcessRunning(pid)) {
+    if (Date.now() >= deadline) return false
+    await sleep(25)
+  }
+  return true
+}
+
+function killProcess(pid) {
+  if (!pid) return
+  try {
+    process.kill(pid, 'SIGKILL')
+  } catch {
+    // Best-effort cleanup for regression tests that intentionally create stubborn child processes.
+  }
+}
+
 function jsonResponse(res, payload, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify(payload))
@@ -332,5 +374,41 @@ describe('kaigongba connector capability-first scripts', () => {
       workerId: 'worker_lease',
       leaseSeconds: 30,
     })
+  })
+
+  it('terminates the external executor process tree when execution times out', async () => {
+    const executorFile = join(tempDir, 'stubborn-executor.mjs')
+    const parentPidFile = join(tempDir, 'stubborn-parent.pid')
+    const childPidFile = join(tempDir, 'stubborn-child.pid')
+    await writeFile(
+      executorFile,
+      `import { spawn } from 'node:child_process'\nimport fs from 'node:fs'\nfs.writeFileSync(${JSON.stringify(parentPidFile)}, String(process.pid))\nprocess.on('SIGTERM', () => {})\nconst child = spawn(process.execPath, ['-e', ${JSON.stringify("process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)") }], { stdio: 'ignore' })\nfs.writeFileSync(${JSON.stringify(childPidFile)}, String(child.pid))\nprocess.stdin.resume()\nsetInterval(() => {}, 1000)\n`,
+      'utf8',
+    )
+
+    let parentPid = null
+    let childPid = null
+    try {
+      const run = await runWorkItem({
+        outputDir: join(tempDir, '.kaigongba/runtime'),
+        executorCommand: `node "${executorFile}"`,
+        workerId: 'worker_timeout',
+        leaseSeconds: 30,
+        timeoutMs: 80,
+        executorKillGraceMs: 50,
+      })
+      parentPid = await readPidFile(parentPidFile)
+      childPid = await readPidFile(childPidFile)
+
+      expect(run.ok).toBe(false)
+      expect(run.error).toContain('Executor timed out after 80ms')
+      expect(parentPid).toBeGreaterThan(0)
+      expect(childPid).toBeGreaterThan(0)
+      expect(await waitForProcessExit(parentPid, 1500)).toBe(true)
+      expect(await waitForProcessExit(childPid, 1500)).toBe(true)
+    } finally {
+      killProcess(parentPid)
+      killProcess(childPid)
+    }
   })
 })

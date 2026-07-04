@@ -6,6 +6,9 @@ import { pathToFileURL } from 'node:url'
 import { claimWorkItem, resolveLeaseSeconds, resolveWorkerId } from './claim_work_item.mjs'
 import { apiRequest, arg, defaultStatus, mimeFromName, numberArg, parseArgs, readConnectionConfig, uploadFileToUrl, writeJson } from './lib.mjs'
 
+const DEFAULT_EXECUTOR_TIMEOUT_MS = 30 * 60 * 1000
+const DEFAULT_EXECUTOR_KILL_GRACE_MS = 5000
+
 function defaultOutputDir() {
   return path.resolve(process.cwd(), '.kaigongba/runtime')
 }
@@ -173,33 +176,86 @@ async function postArtifact(workItem, config, artifactInput = {}, index = 0) {
   return { ...eventResult, upload: uploadResult, completed }
 }
 
-async function executeCommand(command, workItem, timeoutMs) {
+function terminateProcessGroup(child, signal) {
+  if (!child?.pid) return false
+  if (process.platform !== 'win32') {
+    try {
+      process.kill(-child.pid, signal)
+      return true
+    } catch (error) {
+      if (error?.code === 'ESRCH') return false
+      try {
+        child.kill(signal)
+        return true
+      } catch {
+        return false
+      }
+    }
+  }
+  try {
+    child.kill(signal)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function executeCommand(command, workItem, timeoutMs, options = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, { shell: true, stdio: ['pipe', 'pipe', 'pipe'] })
+    const killGraceMs = Math.max(0, numberArg(options.killGraceMs, DEFAULT_EXECUTOR_KILL_GRACE_MS))
+    const child = spawn(command, {
+      shell: true,
+      detached: process.platform !== 'win32',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    })
     const stdout = []
     const stderr = []
+    let settled = false
+    let timedOut = false
+    let killTimer = null
+    let abandonTimer = null
+    const timeoutError = new Error(`Executor timed out after ${timeoutMs}ms`)
+    const settle = (callback, value) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
+      if (abandonTimer) clearTimeout(abandonTimer)
+      callback(value)
+    }
     const timer = setTimeout(() => {
-      child.kill('SIGTERM')
-      reject(new Error(`Executor timed out after ${timeoutMs}ms`))
+      timedOut = true
+      terminateProcessGroup(child, 'SIGTERM')
+      killTimer = setTimeout(() => {
+        terminateProcessGroup(child, 'SIGKILL')
+      }, killGraceMs)
+      abandonTimer = setTimeout(() => {
+        settle(reject, timeoutError)
+      }, killGraceMs + 2000)
     }, timeoutMs)
     child.stdout.on('data', (chunk) => stdout.push(chunk))
     child.stderr.on('data', (chunk) => stderr.push(chunk))
     child.on('error', (error) => {
-      clearTimeout(timer)
-      reject(error)
+      settle(reject, error)
     })
     child.on('close', (code) => {
       clearTimeout(timer)
+      if (killTimer) clearTimeout(killTimer)
+      if (abandonTimer) clearTimeout(abandonTimer)
+      if (timedOut) {
+        settle(reject, timeoutError)
+        return
+      }
       const out = Buffer.concat(stdout).toString('utf8').trim()
       const err = Buffer.concat(stderr).toString('utf8').trim()
       if (code !== 0) {
-        reject(new Error(err || `Executor exited with code ${code}`))
+        settle(reject, new Error(err || `Executor exited with code ${code}`))
         return
       }
       try {
-        resolve(out ? JSON.parse(out) : {})
+        settle(resolve, out ? JSON.parse(out) : {})
       } catch (error) {
-        reject(new Error(`Executor returned invalid JSON: ${error instanceof Error ? error.message : 'parse failed'}`))
+        settle(reject, new Error(`Executor returned invalid JSON: ${error instanceof Error ? error.message : 'parse failed'}`))
       }
     })
     child.stdin.end(`${JSON.stringify(workItem)}\n`)
@@ -224,7 +280,11 @@ export async function runWorkItem(args = {}) {
   const executorCommand = compact(arg(args, ['executor-command', 'executorCommand'], process.env.KAIGONGBA_EXECUTOR_COMMAND))
   if (!executorCommand) throw new Error('KAIGONGBA_EXECUTOR_COMMAND or --executor-command is required')
   const outputDir = path.resolve(String(arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
-  const timeoutMs = numberArg(arg(args, ['timeout-ms', 'timeoutMs'], process.env.KAIGONGBA_EXECUTOR_TIMEOUT_MS), 10 * 60 * 1000)
+  const timeoutMs = numberArg(arg(args, ['timeout-ms', 'timeoutMs'], process.env.KAIGONGBA_EXECUTOR_TIMEOUT_MS), DEFAULT_EXECUTOR_TIMEOUT_MS)
+  const executorKillGraceMs = numberArg(
+    arg(args, ['executor-kill-grace-ms', 'executorKillGraceMs'], process.env.KAIGONGBA_EXECUTOR_KILL_GRACE_MS),
+    DEFAULT_EXECUTOR_KILL_GRACE_MS,
+  )
   const workerId = resolveWorkerId(args, config)
   const leaseSeconds = resolveLeaseSeconds(args)
   const claimed = await claimWorkItem({ ...args, outputDir, workerId, leaseSeconds })
@@ -235,7 +295,7 @@ export async function runWorkItem(args = {}) {
 
   try {
     events.push(await postEvent(workItem, config, { event: 'node.started', message: 'Agent 已领取任务并开始执行' }, 1))
-    const executorResult = normalizeExecutorResult(await executeCommand(executorCommand, workItem, timeoutMs))
+    const executorResult = normalizeExecutorResult(await executeCommand(executorCommand, workItem, timeoutMs, { killGraceMs: executorKillGraceMs }))
     let index = 10
     for (const event of executorResult.progressEvents) {
       events.push(await postEvent(workItem, config, event, index))

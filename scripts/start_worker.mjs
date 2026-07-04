@@ -71,6 +71,32 @@ export async function stopExisting(pidFile, options = {}) {
   return { stopped: true, pid, exited: await waitForExit(pid, options.killTimeoutMs ?? 2000), signal: 'SIGKILL', forced: true }
 }
 
+function appendOption(argv, args, names, flagName) {
+  const value = arg(args, names, undefined)
+  if (value === undefined || value === null || value === '' || value === false) return
+  argv.push(`--${flagName}`)
+  if (value !== true) argv.push(String(value))
+}
+
+export function workerDaemonArgs(args = {}, paths = {}) {
+  const workerScript = path.join(SCRIPT_DIR, 'worker_daemon.mjs')
+  const outputDir = path.resolve(String(paths.outputDir || arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
+  const statusFile = path.resolve(String(paths.statusFile || arg(args, ['status-file', 'statusFile'], path.join(outputDir, 'worker-status.json'))))
+  const argv = [workerScript, '--output-dir', outputDir, '--status-file', statusFile]
+  appendOption(argv, args, ['connection-id', 'connectionId'], 'connection-id')
+  appendOption(argv, args, ['worker-id', 'workerId'], 'worker-id')
+  appendOption(argv, args, ['timeout-ms', 'timeoutMs'], 'timeout-ms')
+  appendOption(argv, args, ['executor-kill-grace-ms', 'executorKillGraceMs'], 'executor-kill-grace-ms')
+  appendOption(argv, args, ['poll-interval-ms', 'pollIntervalMs'], 'poll-interval-ms')
+  appendOption(argv, args, ['error-interval-ms', 'errorIntervalMs'], 'error-interval-ms')
+  appendOption(argv, args, ['lease-seconds', 'leaseSeconds'], 'lease-seconds')
+  appendOption(argv, args, ['lease-renew-interval-ms', 'leaseRenewIntervalMs'], 'lease-renew-interval-ms')
+  appendOption(argv, args, ['max-iterations', 'maxIterations'], 'max-iterations')
+  appendOption(argv, args, ['max-runs', 'maxRuns'], 'max-runs')
+  appendOption(argv, args, 'once', 'once')
+  return argv
+}
+
 export async function startWorker(args = {}) {
   const config = await readConnectionConfig()
   const executorCommand = compact(arg(args, ['executor-command', 'executorCommand'], process.env.KAIGONGBA_EXECUTOR_COMMAND))
@@ -103,8 +129,8 @@ export async function startWorker(args = {}) {
     return { ...result, foreground: true, pidFile, statusFile }
   }
 
-  const workerScript = path.join(SCRIPT_DIR, 'worker_daemon.mjs')
-  const child = spawn(process.execPath, [workerScript, '--output-dir', outputDir, '--status-file', statusFile], {
+  const daemonArgs = workerDaemonArgs(args, { outputDir, statusFile })
+  const child = spawn(process.execPath, daemonArgs, {
     cwd: SKILL_DIR,
     detached: true,
     stdio: 'ignore',
@@ -125,6 +151,7 @@ export async function startWorker(args = {}) {
     pidFile,
     statusFile,
     executorCommand,
+    daemonArgs,
   }
   await writeJson(path.join(outputDir, 'worker-start.json'), result)
   return result

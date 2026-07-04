@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { isProcessRunning, startWorker, stopExisting } from './start_worker.mjs'
+import { isProcessRunning, startWorker, stopExisting, workerDaemonArgs } from './start_worker.mjs'
 
 let tempDir
 let previousConfig
@@ -57,5 +57,36 @@ describe('start worker', () => {
 
     expect(result).toMatchObject({ stopped: true, pid: child.pid, exited: true })
     expect(isProcessRunning(child.pid)).toBe(false)
+  })
+
+  it('passes execution lifecycle options to the background daemon', () => {
+    const argv = workerDaemonArgs({
+      timeoutMs: 1800000,
+      pollIntervalMs: 2000,
+      errorIntervalMs: 3000,
+      leaseSeconds: 120,
+      leaseRenewIntervalMs: 40000,
+      maxIterations: 1,
+      once: true,
+    }, {
+      outputDir: '/tmp/kgb-runtime',
+      statusFile: '/tmp/kgb-runtime/worker-status.json',
+    })
+
+    expect(argv).toEqual(expect.arrayContaining([
+      '--timeout-ms',
+      '1800000',
+      '--poll-interval-ms',
+      '2000',
+      '--error-interval-ms',
+      '3000',
+      '--lease-seconds',
+      '120',
+      '--lease-renew-interval-ms',
+      '40000',
+      '--max-iterations',
+      '1',
+      '--once',
+    ]))
   })
 })

@@ -6,6 +6,8 @@ import { runRuntimeTick } from './runtime_tick.mjs'
 import { apiBase, arg, numberArg, parseArgs, readConnectionConfig, writeJson } from './lib.mjs'
 
 const EXECUTABLE_WORK_ITEM_STATUSES = new Set(['queued', 'revision_requested', 'revising', 'claimed', 'running'])
+const DEFAULT_EXECUTOR_TIMEOUT_MS = 30 * 60 * 1000
+const DEFAULT_EXECUTOR_KILL_GRACE_MS = 5000
 
 function defaultOutputDir() {
   return path.resolve(process.cwd(), '.kaigongba/runtime')
@@ -95,7 +97,11 @@ function resolvedArgs(args = {}, config = {}) {
     statusFile: path.resolve(String(arg(args, ['status-file', 'statusFile'], path.join(outputDir, 'worker-status.json')))),
     pollIntervalMs: positiveNumberArg(arg(args, ['poll-interval-ms', 'pollIntervalMs'], process.env.KAIGONGBA_WORKER_POLL_INTERVAL_MS), 5000),
     errorIntervalMs: positiveNumberArg(arg(args, ['error-interval-ms', 'errorIntervalMs'], process.env.KAIGONGBA_WORKER_ERROR_INTERVAL_MS), 15000),
-    timeoutMs: positiveNumberArg(arg(args, ['timeout-ms', 'timeoutMs'], process.env.KAIGONGBA_EXECUTOR_TIMEOUT_MS), 10 * 60 * 1000),
+    timeoutMs: positiveNumberArg(arg(args, ['timeout-ms', 'timeoutMs'], process.env.KAIGONGBA_EXECUTOR_TIMEOUT_MS), DEFAULT_EXECUTOR_TIMEOUT_MS),
+    executorKillGraceMs: positiveNumberArg(
+      arg(args, ['executor-kill-grace-ms', 'executorKillGraceMs'], process.env.KAIGONGBA_EXECUTOR_KILL_GRACE_MS),
+      DEFAULT_EXECUTOR_KILL_GRACE_MS,
+    ),
     maxIterations: optionalPositiveNumberArg(arg(args, ['max-iterations', 'maxIterations'], undefined)),
     maxRuns: optionalPositiveNumberArg(arg(args, ['max-runs', 'maxRuns'], undefined)),
     once: boolArg(arg(args, 'once', false), false),
@@ -153,6 +159,7 @@ export async function runWorkerDaemon(args = {}, deps = {}) {
         connectionId,
         executorCommand: options.executorCommand,
         timeoutMs: options.timeoutMs,
+        executorKillGraceMs: options.executorKillGraceMs,
       })
       state.runs += 1
       state.lastRun = summarizeRun(run)
