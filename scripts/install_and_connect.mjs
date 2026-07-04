@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiRequest, arg, parseArgs, readConnectionConfig, required, resolveMainAgent, writeConnectionConfig } from './lib.mjs'
 import { runOnboard } from './onboard.mjs'
+import { startWorker } from './start_worker.mjs'
 
 const args = parseArgs()
 const connectCode = required(arg(args, ['connect-code', 'connectCode'], process.env.KAIGONGBA_CONNECT_CODE), '--connect-code')
@@ -61,6 +62,7 @@ const config = {
 }
 const configPath = await writeConnectionConfig(config)
 const shouldOnboard = arg(args, 'onboard') === true
+const shouldStartWorker = arg(args, ['start-worker', 'startWorker']) === true
 
 const result = {
   ok: true,
@@ -73,13 +75,21 @@ const result = {
   expiresAt: config.expiresAt,
 }
 
+let workerResult = null
+if (shouldStartWorker) {
+  workerResult = await startWorker({
+    ...args,
+    'output-dir': path.join(installDir, '.kaigongba/runtime'),
+  })
+}
+
 if (shouldOnboard) {
   const onboardResult = await runOnboard({
     ...args,
     'manifest-file': path.join(installDir, 'capabilities-manifest.json'),
     'discovery-file': path.join(installDir, 'discovery.json'),
   })
-  process.stdout.write(`${JSON.stringify({ ...result, onboard: onboardResult }, null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify({ ...result, worker: workerResult, onboard: onboardResult }, null, 2)}\n`)
   if (onboardResult.reviewUrl) {
     process.stdout.write(`\nOpen ${onboardResult.reviewUrl} to review and upload this Agent service.\n`)
   }
@@ -88,6 +98,7 @@ if (shouldOnboard) {
     `${JSON.stringify(
       {
         ...result,
+        worker: workerResult,
         nextCommand: `cd ${installDir} && node scripts/onboard.mjs`,
       },
       null,

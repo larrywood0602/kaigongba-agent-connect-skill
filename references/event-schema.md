@@ -22,8 +22,8 @@ POST /api/workflow-runs/:runId/events
     "name": "PPT Production Agent"
   },
   "reportedByAgent": {
-    "id": "seller_orchestrator",
-    "name": "Seller Orchestrator"
+    "id": "codex_orchestrator",
+    "name": "Codex Agent"
   },
   "sequence": 18,
   "idempotencyKey": "order_123-external_agent_execution-18"

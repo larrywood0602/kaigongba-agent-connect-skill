@@ -8,6 +8,9 @@ export function validateManifest(manifest) {
 
   if (!manifest || typeof manifest !== 'object') errors.push('manifest must be a JSON object')
   if (manifest?.schemaVersion !== '1.0') warnings.push('schemaVersion should be "1.0"')
+  const provider = String(manifest?.mainAgent?.provider ?? '').trim().toLowerCase().replace(/\s+/g, '_')
+  if (!provider) errors.push('mainAgent.provider is required')
+  if (['custom', 'unknown'].includes(provider)) errors.push('mainAgent.provider must be the real Agent platform, not custom or unknown')
   if (!manifest?.mainAgent?.externalAgentId) errors.push('mainAgent.externalAgentId is required')
   if (!manifest?.mainAgent?.name) errors.push('mainAgent.name is required')
   if (!manifest?.serviceCard?.name) errors.push('serviceCard.name is required')
