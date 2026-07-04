@@ -47,4 +47,34 @@ describe('Codex work item executor', () => {
     })
     expect(await readFile(result.artifacts[0].file, 'utf8')).toContain('Nike product image concept')
   })
+
+  it('materializes base64 work item attachments before running codex', async () => {
+    const fakeCodex = join(tempDir, 'fake-codex-attachments.mjs')
+    await writeFile(
+      fakeCodex,
+      `#!/usr/bin/env node\nimport fs from 'node:fs'\nimport path from 'node:path'\nlet prompt = ''\nprocess.stdin.on('data', (chunk) => { prompt += chunk })\nprocess.stdin.on('end', () => {\n  const args = process.argv.slice(2)\n  const outputIndex = args.indexOf('--output-last-message')\n  const resultFile = args[outputIndex + 1]\n  const cdIndex = args.indexOf('--cd')\n  const outputDir = args[cdIndex + 1]\n  const marker = 'input-attachments/shoe.jpg'\n  if (!prompt.includes(marker)) throw new Error('attachment local path missing from prompt')\n  const localFile = path.join(outputDir, marker)\n  const bytes = fs.readFileSync(localFile)\n  if (bytes.toString('utf8') !== 'fake image bytes') throw new Error('attachment bytes not materialized')\n  const artifactFile = path.join(outputDir, 'result.md')\n  fs.writeFileSync(artifactFile, 'used ' + marker)\n  fs.writeFileSync(resultFile, JSON.stringify({\n    status: 'completed',\n    progressEvents: [],\n    artifacts: [{ name: 'result.md', type: 'md', file: artifactFile }],\n    finalMessage: 'attachment handled'\n  }))\n})\n`,
+      'utf8',
+    )
+    await chmod(fakeCodex, 0o755)
+
+    const result = await runCodexWorkItemExecutor({
+      outputDir: tempDir,
+      env: { ...process.env, CODEX_EXECUTABLE: fakeCodex },
+      workItem: {
+        id: 'work_codex_attachment',
+        orderId: 'order_1',
+        payload: {
+          requirement: { title: '鞋子场景图生成', goal: '为上传鞋图生成场景图' },
+          attachments: [{
+            name: 'shoe.jpg',
+            type: 'image/jpeg',
+            contentBase64: Buffer.from('fake image bytes', 'utf8').toString('base64'),
+          }],
+        },
+      },
+    })
+
+    expect(result).toMatchObject({ status: 'completed', finalMessage: 'attachment handled' })
+    expect(await readFile(result.artifacts[0].file, 'utf8')).toContain('input-attachments')
+  })
 })

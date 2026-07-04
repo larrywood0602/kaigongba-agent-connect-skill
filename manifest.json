@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "kind": "skill_package",
   "distribution": {
     "preferred": "github_npx",
@@ -28,15 +28,15 @@
     },
     "SKILL.md": {
       "required": true,
-      "sha256": "a6a3ba50c8975e619caeea7ac8e6eab2c5dd297b8087cc5d7f549392700e8b80"
+      "sha256": "1ca5ce8b51b853c8f6c0fcec06b1c40223fcde75b59ae2271a1bb62334c12d9e"
     },
     "README.md": {
       "required": true,
-      "sha256": "9e20266b31f55b6a765b90fe832c2fbdf837d44a2588e4f1a845fe60ed0d42da"
+      "sha256": "6eeb3a2da88bd9e8e91b1f676901bc7333f9a887185794b48daba4cbf5ee8ca6"
     },
     "package.json": {
       "required": true,
-      "sha256": "f59003d86da9aefe5dfe8ee061554de567206351cbc0fc46a2b04c4041d0b4f2"
+      "sha256": "e13d10c7b0918c2a194bb6ff5b67c81eebd3bd5b1065434877bd9ba3364997c4"
     },
     "agents/openai.yaml": {
       "required": true,
@@ -76,7 +76,7 @@
     },
     "scripts/codex_work_item_executor.mjs": {
       "required": true,
-      "sha256": "dc1d6d8761e210678990bb7a5af250091b7b39f50ac6b8db4a1f5b90a2072b46"
+      "sha256": "f403f4a42cb207aa840d29ba0d722af7268013085e4623551ec990556a08eaca"
     },
     "scripts/create_service_from_capability.mjs": {
       "required": true,

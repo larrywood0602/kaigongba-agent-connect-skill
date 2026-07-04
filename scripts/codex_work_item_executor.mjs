@@ -14,6 +14,84 @@ function defaultOutputDir() {
   return path.resolve(process.cwd(), '.kaigongba/runtime/codex-artifacts')
 }
 
+function safeFileName(value, fallback) {
+  const name = compact(value)
+    .replace(/[\\/]+/g, '-')
+    .split('')
+    .filter((char) => char.charCodeAt(0) >= 32)
+    .join('')
+    .trim()
+  return name || fallback
+}
+
+function decodeAttachmentBytes(attachment = {}) {
+  const metadata = attachment.metadata && typeof attachment.metadata === 'object' ? attachment.metadata : {}
+  const raw = compact(
+    attachment.contentBase64
+      || attachment.base64
+      || attachment.bytesBase64
+      || attachment.dataUrl
+      || attachment.data_url
+      || metadata.contentBase64
+      || metadata.base64
+      || metadata.bytesBase64
+      || metadata.dataUrl,
+  )
+  if (!raw) return null
+  const base64 = raw.startsWith('data:') && raw.includes(',') ? raw.slice(raw.indexOf(',') + 1) : raw
+  const bytes = Buffer.from(base64, 'base64')
+  return bytes.length ? bytes : null
+}
+
+async function materializeAttachments(workItem, outputDir) {
+  const cloned = JSON.parse(JSON.stringify(workItem))
+  const payload = cloned.payload && typeof cloned.payload === 'object' ? cloned.payload : {}
+  const attachments = Array.isArray(payload.attachments) ? payload.attachments : []
+  if (attachments.length === 0) return cloned
+
+  const attachmentDir = path.join(outputDir, 'input-attachments')
+  await fs.mkdir(attachmentDir, { recursive: true })
+  const usedNames = new Set()
+  const materialized = []
+  for (const [index, attachment] of attachments.entries()) {
+    const next = { ...attachment }
+    const bytes = decodeAttachmentBytes(attachment)
+    if (bytes) {
+      const preferredName = safeFileName(next.name, `attachment-${index + 1}`)
+      const parsed = path.parse(preferredName)
+      let fileName = preferredName
+      let suffix = 1
+      while (usedNames.has(fileName)) {
+        fileName = `${parsed.name || 'attachment'}-${suffix}${parsed.ext}`
+        suffix += 1
+      }
+      usedNames.add(fileName)
+      const filePath = path.join(attachmentDir, fileName)
+      await fs.writeFile(filePath, bytes)
+      next.localPath = filePath
+      next.relativePath = path.posix.join('input-attachments', fileName)
+      next.availableToAgent = true
+      delete next.contentBase64
+      delete next.dataUrl
+      delete next.base64
+      delete next.bytesBase64
+    }
+    materialized.push(next)
+  }
+  payload.attachments = materialized
+  if (payload.requirement && typeof payload.requirement === 'object' && Array.isArray(payload.requirement.files)) {
+    payload.requirement.files = payload.requirement.files.map((file) => {
+      const match = materialized.find((attachment) =>
+        compact(attachment.id) && compact(attachment.id) === compact(file.id)
+        || compact(attachment.fileObjectId) && compact(attachment.fileObjectId) === compact(file.fileObjectId)
+        || compact(attachment.name) && compact(attachment.name) === compact(file.name))
+      return match ? { ...file, localPath: match.localPath, relativePath: match.relativePath, availableToAgent: match.availableToAgent } : file
+    })
+  }
+  cloned.payload = payload
+  return cloned
+}
+
 function requirementFromWorkItem(workItem = {}) {
   const payload = workItem.payload && typeof workItem.payload === 'object' ? workItem.payload : {}
   const requirement = payload.requirement && typeof payload.requirement === 'object' ? payload.requirement : {}
@@ -181,7 +259,8 @@ export async function runCodexWorkItemExecutor({ workItem, outputDir, env = proc
   const schemaFile = path.join(artifactDir, 'codex-result.schema.json')
   const resultFile = path.join(artifactDir, 'codex-result.json')
   await writeJson(schemaFile, resultSchema())
-  await runCodex({ prompt: promptForWorkItem(workItem, artifactDir), outputDir: artifactDir, schemaFile, resultFile, env })
+  const executableWorkItem = await materializeAttachments(workItem, artifactDir)
+  await runCodex({ prompt: promptForWorkItem(executableWorkItem, artifactDir), outputDir: artifactDir, schemaFile, resultFile, env })
   const result = parseJsonOutput(await fs.readFile(resultFile, 'utf8').catch(() => ''))
   const artifacts = await assertArtifactFiles(Array.isArray(result.artifacts) ? result.artifacts : [], artifactDir)
   if (result.status !== 'failed' && artifacts.length === 0) throw new Error('Codex completed without creating artifact files')
