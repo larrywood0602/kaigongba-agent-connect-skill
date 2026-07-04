@@ -1,10 +1,12 @@
 import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { runCodexWorkItemExecutor } from './codex_work_item_executor.mjs'
 
 let tempDir
+let server
 
 describe('Codex work item executor', () => {
   beforeEach(async () => {
@@ -12,6 +14,8 @@ describe('Codex work item executor', () => {
   })
 
   afterEach(async () => {
+    if (server) await new Promise((resolve) => server.close(resolve))
+    server = null
     await rm(tempDir, { recursive: true, force: true })
   })
 
@@ -75,6 +79,57 @@ describe('Codex work item executor', () => {
     })
 
     expect(result).toMatchObject({ status: 'completed', finalMessage: 'attachment handled' })
+    expect(await readFile(result.artifacts[0].file, 'utf8')).toContain('input-attachments')
+  })
+
+  it('downloads signed work item attachments before running codex', async () => {
+    const attachmentBytes = Buffer.from('downloaded shoe image bytes', 'utf8')
+    server = createServer((req, res) => {
+      if (req.url === '/download/shoe.jpg?token=signed-token') {
+        res.writeHead(200, { 'Content-Type': 'image/jpeg' })
+        res.end(attachmentBytes)
+        return
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' })
+      res.end('not found')
+    })
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+    const { port } = server.address()
+    const downloadUrl = `http://127.0.0.1:${port}/download/shoe.jpg?token=signed-token`
+
+    const fakeCodex = join(tempDir, 'fake-codex-download.mjs')
+    await writeFile(
+      fakeCodex,
+      `#!/usr/bin/env node\nimport fs from 'node:fs'\nimport path from 'node:path'\nlet prompt = ''\nprocess.stdin.on('data', (chunk) => { prompt += chunk })\nprocess.stdin.on('end', () => {\n  const args = process.argv.slice(2)\n  const outputIndex = args.indexOf('--output-last-message')\n  const resultFile = args[outputIndex + 1]\n  const cdIndex = args.indexOf('--cd')\n  const outputDir = args[cdIndex + 1]\n  const marker = 'input-attachments/shoe.jpg'\n  if (!prompt.includes(marker)) throw new Error('downloaded attachment local path missing from prompt')\n  if (prompt.includes('signed-token')) throw new Error('signed download URL leaked into prompt')\n  const localFile = path.join(outputDir, marker)\n  const bytes = fs.readFileSync(localFile)\n  if (bytes.toString('utf8') !== 'downloaded shoe image bytes') throw new Error('downloaded attachment bytes not materialized')\n  const artifactFile = path.join(outputDir, 'download-result.md')\n  fs.writeFileSync(artifactFile, 'used downloaded ' + marker)\n  fs.writeFileSync(resultFile, JSON.stringify({\n    status: 'completed',\n    progressEvents: [],\n    artifacts: [{ name: 'download-result.md', type: 'md', file: artifactFile }],\n    finalMessage: 'download attachment handled'\n  }))\n})\n`,
+      'utf8',
+    )
+    await chmod(fakeCodex, 0o755)
+
+    const result = await runCodexWorkItemExecutor({
+      outputDir: tempDir,
+      env: { ...process.env, CODEX_EXECUTABLE: fakeCodex },
+      workItem: {
+        id: 'work_codex_download_attachment',
+        orderId: 'order_1',
+        payload: {
+          requirement: {
+            title: '鞋子场景图生成',
+            goal: '为上传鞋图生成场景图',
+            files: [{ id: 'file_shoe', name: 'shoe.jpg' }],
+          },
+          attachments: [{
+            id: 'file_shoe',
+            name: 'shoe.jpg',
+            type: 'image/jpeg',
+            downloadUrl,
+            downloadExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+            metadata: { inlineBytes: false, inlineOmittedReason: 'file_too_large' },
+          }],
+        },
+      },
+    })
+
+    expect(result).toMatchObject({ status: 'completed', finalMessage: 'download attachment handled' })
     expect(await readFile(result.artifacts[0].file, 'utf8')).toContain('input-attachments')
   })
 })

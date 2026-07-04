@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { claimWorkItem } from './claim_work_item.mjs'
+import { claimWorkItem, resolveLeaseSeconds, resolveWorkerId } from './claim_work_item.mjs'
 import { apiRequest, arg, defaultStatus, mimeFromName, numberArg, parseArgs, readConnectionConfig, uploadFileToUrl, writeJson } from './lib.mjs'
 
 function defaultOutputDir() {
@@ -55,6 +55,57 @@ async function postEvent(workItem, config, eventInput = {}, index = 0) {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+function leaseRenewIntervalMs(args = {}, leaseSeconds = 0) {
+  const explicit = numberArg(
+    arg(args, ['lease-renew-interval-ms', 'leaseRenewIntervalMs'], process.env.KAIGONGBA_WORK_ITEM_LEASE_RENEW_INTERVAL_MS),
+    undefined,
+  )
+  if (Number.isFinite(explicit)) return Math.max(1, Math.floor(explicit))
+  return Math.max(5000, Math.floor((leaseSeconds * 1000) / 3))
+}
+
+async function renewWorkItemLease(workItem, { workerId, leaseSeconds }) {
+  return apiRequest(`/api/agent/work-items/${encodeURIComponent(workItem.id)}/lease`, {
+    method: 'POST',
+    body: JSON.stringify({ workerId, leaseSeconds }),
+  })
+}
+
+function startLeaseRenewal(workItem, options = {}) {
+  const intervalMs = leaseRenewIntervalMs(options.args, options.leaseSeconds)
+  const state = {
+    intervalMs,
+    renewals: 0,
+    lastError: '',
+    timer: null,
+  }
+  const tick = async () => {
+    try {
+      await renewWorkItemLease(workItem, options)
+      state.renewals += 1
+      state.lastError = ''
+    } catch (error) {
+      state.lastError = error instanceof Error ? error.message : String(error)
+    }
+  }
+  state.timer = setInterval(() => {
+    void tick()
+  }, intervalMs)
+  return state
+}
+
+function stopLeaseRenewal(state) {
+  if (state?.timer) clearInterval(state.timer)
+}
+
+function leaseRenewalSnapshot(state) {
+  return {
+    renewals: state?.renewals ?? 0,
+    intervalMs: state?.intervalMs ?? null,
+    lastError: state?.lastError || null,
+  }
 }
 
 async function artifactPayload(input = {}) {
@@ -174,10 +225,13 @@ export async function runWorkItem(args = {}) {
   if (!executorCommand) throw new Error('KAIGONGBA_EXECUTOR_COMMAND or --executor-command is required')
   const outputDir = path.resolve(String(arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
   const timeoutMs = numberArg(arg(args, ['timeout-ms', 'timeoutMs'], process.env.KAIGONGBA_EXECUTOR_TIMEOUT_MS), 10 * 60 * 1000)
-  const claimed = await claimWorkItem({ ...args, outputDir })
+  const workerId = resolveWorkerId(args, config)
+  const leaseSeconds = resolveLeaseSeconds(args)
+  const claimed = await claimWorkItem({ ...args, outputDir, workerId, leaseSeconds })
   const workItem = claimed.workItem
   const events = []
   const artifacts = []
+  const leaseRenewal = startLeaseRenewal(workItem, { args, workerId, leaseSeconds })
 
   try {
     events.push(await postEvent(workItem, config, { event: 'node.started', message: 'Agent 已领取任务并开始执行' }, 1))
@@ -197,7 +251,7 @@ export async function runWorkItem(args = {}) {
       event: terminalEvent,
       message: executorResult.finalMessage || (terminalEvent === 'node.failed' ? 'Agent 执行失败' : 'Agent 执行完成'),
     }, 900))
-    const result = { ok: terminalEvent !== 'node.failed', workItem, events, artifacts, executorResult: executorResult.raw, outputDir }
+    const result = { ok: terminalEvent !== 'node.failed', workItem, events, artifacts, executorResult: executorResult.raw, outputDir, leaseRenewal: leaseRenewalSnapshot(leaseRenewal) }
     await writeJson(path.join(outputDir, 'last-run-result.json'), result)
     return result
   } catch (error) {
@@ -205,9 +259,11 @@ export async function runWorkItem(args = {}) {
     events.push(await postEvent(workItem, config, { event: 'node.failed', message: failureMessage }, 999).catch((postError) => ({
       error: postError instanceof Error ? postError.message : 'failed to report node.failed',
     })))
-    const result = { ok: false, workItem, events, artifacts, error: failureMessage, outputDir }
+    const result = { ok: false, workItem, events, artifacts, error: failureMessage, outputDir, leaseRenewal: leaseRenewalSnapshot(leaseRenewal) }
     await writeJson(path.join(outputDir, 'last-run-result.json'), result)
     return result
+  } finally {
+    stopLeaseRenewal(leaseRenewal)
   }
 }
 

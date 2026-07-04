@@ -1,8 +1,9 @@
+import { spawn } from 'node:child_process'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { startWorker } from './start_worker.mjs'
+import { isProcessRunning, startWorker, stopExisting } from './start_worker.mjs'
 
 let tempDir
 let previousConfig
@@ -44,5 +45,17 @@ describe('start worker', () => {
       iterations: 0,
       runs: 0,
     })
+  })
+
+  it('waits for the existing worker process to exit before restart continues', async () => {
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' })
+    const pidFile = join(tempDir, '.kaigongba/runtime/worker.pid')
+    await mkdir(join(tempDir, '.kaigongba/runtime'), { recursive: true })
+    await writeFile(pidFile, `${child.pid}\n`, 'utf8')
+
+    const result = await stopExisting(pidFile, { timeoutMs: 200 })
+
+    expect(result).toMatchObject({ stopped: true, pid: child.pid, exited: true })
+    expect(isProcessRunning(child.pid)).toBe(false)
   })
 })

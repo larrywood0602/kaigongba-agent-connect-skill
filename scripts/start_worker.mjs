@@ -35,7 +35,7 @@ async function readPid(pidFile) {
   }
 }
 
-function isProcessRunning(pid) {
+export function isProcessRunning(pid) {
   if (!pid) return false
   try {
     process.kill(pid, 0)
@@ -45,11 +45,30 @@ function isProcessRunning(pid) {
   }
 }
 
-async function stopExisting(pidFile) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+export async function waitForExit(pid, timeoutMs = 5000) {
+  const deadline = Date.now() + timeoutMs
+  while (isProcessRunning(pid)) {
+    if (Date.now() >= deadline) return false
+    await sleep(50)
+  }
+  return true
+}
+
+export async function stopExisting(pidFile, options = {}) {
   const pid = await readPid(pidFile)
   if (!pid || !isProcessRunning(pid)) return { stopped: false, pid }
   process.kill(pid, 'SIGTERM')
-  return { stopped: true, pid }
+  if (await waitForExit(pid, options.timeoutMs ?? 5000)) return { stopped: true, pid, exited: true, signal: 'SIGTERM' }
+  try {
+    process.kill(pid, 'SIGKILL')
+  } catch {
+    return { stopped: true, pid, exited: true, signal: 'SIGTERM' }
+  }
+  return { stopped: true, pid, exited: await waitForExit(pid, options.killTimeoutMs ?? 2000), signal: 'SIGKILL', forced: true }
 }
 
 export async function startWorker(args = {}) {

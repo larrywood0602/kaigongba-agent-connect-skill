@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import path from 'node:path'
+import { hostname } from 'node:os'
 import { pathToFileURL } from 'node:url'
-import { apiRequest, arg, parseArgs, readConnectionConfig, writeJson } from './lib.mjs'
+import { apiRequest, arg, numberArg, parseArgs, readConnectionConfig, writeJson } from './lib.mjs'
+
+export const DEFAULT_WORK_ITEM_LEASE_SECONDS = 15 * 60
 
 function defaultOutputDir() {
   return path.resolve(process.cwd(), '.kaigongba/runtime')
@@ -23,10 +26,33 @@ export function selectWorkItem(workItems = [], explicitId = '') {
   )
 }
 
+function compact(value) {
+  if (value === undefined || value === null || value === true) return ''
+  return String(value).trim()
+}
+
+export function resolveWorkerId(args = {}, config = {}, env = process.env) {
+  const explicit = compact(arg(args, ['worker-id', 'workerId'], env.KAIGONGBA_WORKER_ID || config.workerId))
+  if (explicit) return explicit
+  const mainAgent = config.mainAgent && typeof config.mainAgent === 'object' ? config.mainAgent : {}
+  const agentId = compact(mainAgent.externalAgentId || config.externalAgentId || config.connectionId || 'agent')
+  return `${agentId}@${hostname()}:${process.pid}`
+}
+
+export function resolveLeaseSeconds(args = {}, env = process.env) {
+  const leaseSeconds = numberArg(
+    arg(args, ['lease-seconds', 'leaseSeconds'], env.KAIGONGBA_WORK_ITEM_LEASE_SECONDS),
+    DEFAULT_WORK_ITEM_LEASE_SECONDS,
+  )
+  return Number.isFinite(leaseSeconds) && leaseSeconds > 0 ? Math.floor(leaseSeconds) : DEFAULT_WORK_ITEM_LEASE_SECONDS
+}
+
 export async function claimWorkItem(args = {}) {
   const config = await readConnectionConfig()
   const connectionId = arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId)
   const explicitWorkItemId = arg(args, ['work-item-id', 'workItemId'], process.env.KAIGONGBA_WORK_ITEM_ID)
+  const workerId = resolveWorkerId(args, config)
+  const leaseSeconds = resolveLeaseSeconds(args)
   if (!connectionId && !explicitWorkItemId) throw new Error('Pass --connection-id or --work-item-id, or run after install_and_connect.mjs')
 
   const queue = connectionId
@@ -40,7 +66,10 @@ export async function claimWorkItem(args = {}) {
     throw new Error('No claimable work item found. Run runtime_tick.mjs to inspect the current queue.')
   }
 
-  const result = await apiRequest(`/api/agent/work-items/${encodeURIComponent(selected.id)}/claim`, { method: 'POST' })
+  const result = await apiRequest(`/api/agent/work-items/${encodeURIComponent(selected.id)}/claim`, {
+    method: 'POST',
+    body: JSON.stringify({ workerId, leaseSeconds }),
+  })
   const outputDir = path.resolve(String(arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
   await writeJson(path.join(outputDir, 'claimed-work-item.json'), result.workItem)
   await writeJson(path.join(outputDir, 'current-work-item.json'), result.workItem)

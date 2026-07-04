@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "kind": "skill_package",
   "distribution": {
     "preferred": "github_npx",
@@ -28,15 +28,15 @@
     },
     "SKILL.md": {
       "required": true,
-      "sha256": "1ca5ce8b51b853c8f6c0fcec06b1c40223fcde75b59ae2271a1bb62334c12d9e"
+      "sha256": "6f49fb0bb5c9376d42fff8f1492aa96d44ceb4212bbcffcd459bd6a5d3c32342"
     },
     "README.md": {
       "required": true,
-      "sha256": "6eeb3a2da88bd9e8e91b1f676901bc7333f9a887185794b48daba4cbf5ee8ca6"
+      "sha256": "fd1211a8139b5eec4d49b19d1a0a4efe54c7775373bbec6dd146c6be0596308c"
     },
     "package.json": {
       "required": true,
-      "sha256": "e13d10c7b0918c2a194bb6ff5b67c81eebd3bd5b1065434877bd9ba3364997c4"
+      "sha256": "938fc35ccd8fa6385ffd143ef265c11d5b5fcb8d5ea5c494d744645954ce8dc7"
     },
     "agents/openai.yaml": {
       "required": true,
@@ -68,7 +68,7 @@
     },
     "scripts/claim_work_item.mjs": {
       "required": true,
-      "sha256": "706849b7d1aeb5d365b1abce869f32652df2b49e55fc51aa2a4b7566e5fac8a2"
+      "sha256": "7bfbf60856b06dd1380230bc9b5ff81b138e6958b9cdee4cab8f2c53efe8177c"
     },
     "scripts/collect_manifest.mjs": {
       "required": true,
@@ -76,7 +76,7 @@
     },
     "scripts/codex_work_item_executor.mjs": {
       "required": true,
-      "sha256": "f403f4a42cb207aa840d29ba0d722af7268013085e4623551ec990556a08eaca"
+      "sha256": "5546769074ba6837d5388256056a59b52be8d2fb972e0c1dde06faadd253d943"
     },
     "scripts/create_service_from_capability.mjs": {
       "required": true,
@@ -128,11 +128,11 @@
     },
     "scripts/run_work_item.mjs": {
       "required": true,
-      "sha256": "5d5e8a89141c8a7d5aa42683fd489351fa9aa103c7f164cfdd7485dd1dd1db19"
+      "sha256": "cfdca7624e268b11c404d8b8e67215577195246e941c83d5a9708fa51658e4f1"
     },
     "scripts/start_worker.mjs": {
       "required": true,
-      "sha256": "a50d1606ef969cf32cff403239ade2014e1cacb6f7cb2d5d5b1d32ad0122b131"
+      "sha256": "4671947c87621fd88666a4a8a9dabc2eb8a6df9cc1c6607c7a42a3e07846eae9"
     },
     "scripts/runtime_tick.mjs": {
       "required": true,

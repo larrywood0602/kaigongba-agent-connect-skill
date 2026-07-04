@@ -115,6 +115,31 @@ async function startMockServer() {
       })
       return
     }
+    if (req.url === '/api/agent/work-items/work_mock_1/lease' && req.method === 'POST') {
+      jsonResponse(res, {
+        workItem: {
+          id: 'work_mock_1',
+          connectionId: 'conn_mock',
+          orderId: 'order_mock_1',
+          serviceSopId: 'sop_html',
+          nodeKey: 'external_agent_execution',
+          status: 'running',
+          claimedBy: body.workerId,
+          leaseExpiresAt: new Date(Date.now() + Number(body.leaseSeconds || 900) * 1000).toISOString(),
+          payload: {
+            requirement: { goal: '生成 HTML 报告' },
+            callback: {
+              runId: 'order_mock_1',
+              connectionId: 'conn_mock',
+              serviceSopId: 'sop_html',
+              nodeKey: 'external_agent_execution',
+            },
+            idempotencyKey: 'order_mock_1-external_agent_execution-initial',
+          },
+        },
+      })
+      return
+    }
     if (req.url === '/api/workflow-runs/order_mock_1/events' && req.method === 'POST') {
       jsonResponse(res, {
         event: { id: `event_${requests.length}`, ...body },
@@ -233,7 +258,12 @@ describe('kaigongba connector capability-first scripts', () => {
     const readiness = await getServiceReadiness('sop_html')
     const published = await publishService('sop_html')
     const tick = await runRuntimeTick({ outputDir: join(tempDir, '.kaigongba/runtime') })
-    const run = await runWorkItem({ outputDir: join(tempDir, '.kaigongba/runtime'), executorCommand: `node "${executorFile}"` })
+    const run = await runWorkItem({
+      outputDir: join(tempDir, '.kaigongba/runtime'),
+      executorCommand: `node "${executorFile}"`,
+      workerId: 'worker_flow',
+      leaseSeconds: 300,
+    })
     const action = await recordAction({
       action: 'deliver_run',
       targetId: 'order_mock_1',
@@ -250,7 +280,10 @@ describe('kaigongba connector capability-first scripts', () => {
     expect(tick.pendingRuns).toHaveLength(1)
     expect(tick.pendingWorkItems).toHaveLength(1)
     expect(run.ok).toBe(true)
-    expect(requests.some((request) => request.url === '/api/agent/work-items/work_mock_1/claim')).toBe(true)
+    expect(requests.find((request) => request.url === '/api/agent/work-items/work_mock_1/claim')?.body).toMatchObject({
+      workerId: 'worker_flow',
+      leaseSeconds: 300,
+    })
     expect(requests.filter((request) => request.url === '/api/workflow-runs/order_mock_1/events').map((request) => request.body.event)).toEqual([
       'node.started',
       'node.progress',
@@ -274,5 +307,30 @@ describe('kaigongba connector capability-first scripts', () => {
     expect(runResult.ok).toBe(true)
     expect(runResult.artifacts[0]).toMatchObject({ upload: { uploaded: true }, completed: { artifact: { status: 'uploaded' } } })
     expect(actions.actions['deliver-order_mock_1']).toMatchObject({ status: 'done', idempotency_key: 'deliver-order_mock_1' })
+  })
+
+  it('renews the claimed work item lease while the external executor is running', async () => {
+    const executorFile = join(tempDir, 'slow-executor.mjs')
+    await writeFile(
+      executorFile,
+      `setTimeout(() => {\n  console.log(JSON.stringify({\n    progressEvents: [],\n    artifacts: [],\n    finalMessage: 'slow executor completed'\n  }))\n}, 40)\nprocess.stdin.resume()\n`,
+      'utf8',
+    )
+
+    const run = await runWorkItem({
+      outputDir: join(tempDir, '.kaigongba/runtime'),
+      executorCommand: `node "${executorFile}"`,
+      workerId: 'worker_lease',
+      leaseSeconds: 30,
+      leaseRenewIntervalMs: 1,
+    })
+
+    expect(run.ok).toBe(true)
+    const leaseRequests = requests.filter((request) => request.url === '/api/agent/work-items/work_mock_1/lease')
+    expect(leaseRequests.length).toBeGreaterThan(0)
+    expect(leaseRequests[0].body).toMatchObject({
+      workerId: 'worker_lease',
+      leaseSeconds: 30,
+    })
   })
 })

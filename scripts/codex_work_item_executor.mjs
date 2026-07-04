@@ -43,7 +43,63 @@ function decodeAttachmentBytes(attachment = {}) {
   return bytes.length ? bytes : null
 }
 
-async function materializeAttachments(workItem, outputDir) {
+function resolveAttachmentDownloadUrl(attachment = {}, env = process.env) {
+  const metadata = attachment.metadata && typeof attachment.metadata === 'object' ? attachment.metadata : {}
+  const raw = compact(
+    attachment.downloadUrl
+      || attachment.download_url
+      || attachment.url
+      || metadata.downloadUrl
+      || metadata.download_url
+      || metadata.url,
+  )
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw)) return raw
+  if (raw.startsWith('/')) {
+    const apiBaseUrl = compact(env.KAIGONGBA_API_BASE_URL)
+    if (!apiBaseUrl) return ''
+    return new URL(raw, apiBaseUrl.replace(/\/+$/, '')).toString()
+  }
+  return ''
+}
+
+async function downloadAttachmentBytes(attachment = {}, { env = process.env, fetchImpl = globalThis.fetch } = {}) {
+  const url = resolveAttachmentDownloadUrl(attachment, env)
+  if (!url) return null
+  if (typeof fetchImpl !== 'function') throw new Error('fetch is required to download work item attachments')
+  const response = await fetchImpl(url)
+  if (!response.ok) {
+    const text = await response.text().catch(() => '')
+    throw new Error(`Failed to download attachment ${attachment.name || attachment.id || ''}: HTTP ${response.status} ${text || response.statusText}`.trim())
+  }
+  const bytes = Buffer.from(await response.arrayBuffer())
+  return bytes.length ? bytes : null
+}
+
+function removeInlineAndDownloadSecrets(attachment = {}) {
+  delete attachment.contentBase64
+  delete attachment.dataUrl
+  delete attachment.data_url
+  delete attachment.base64
+  delete attachment.bytesBase64
+  delete attachment.downloadUrl
+  delete attachment.download_url
+  delete attachment.downloadExpiresAt
+  delete attachment.download_expires_at
+  delete attachment.url
+  if (attachment.metadata && typeof attachment.metadata === 'object') {
+    delete attachment.metadata.contentBase64
+    delete attachment.metadata.dataUrl
+    delete attachment.metadata.data_url
+    delete attachment.metadata.base64
+    delete attachment.metadata.bytesBase64
+    delete attachment.metadata.downloadUrl
+    delete attachment.metadata.download_url
+    delete attachment.metadata.url
+  }
+}
+
+async function materializeAttachments(workItem, outputDir, env = process.env) {
   const cloned = JSON.parse(JSON.stringify(workItem))
   const payload = cloned.payload && typeof cloned.payload === 'object' ? cloned.payload : {}
   const attachments = Array.isArray(payload.attachments) ? payload.attachments : []
@@ -55,7 +111,7 @@ async function materializeAttachments(workItem, outputDir) {
   const materialized = []
   for (const [index, attachment] of attachments.entries()) {
     const next = { ...attachment }
-    const bytes = decodeAttachmentBytes(attachment)
+    const bytes = decodeAttachmentBytes(attachment) || await downloadAttachmentBytes(attachment, { env })
     if (bytes) {
       const preferredName = safeFileName(next.name, `attachment-${index + 1}`)
       const parsed = path.parse(preferredName)
@@ -71,10 +127,7 @@ async function materializeAttachments(workItem, outputDir) {
       next.localPath = filePath
       next.relativePath = path.posix.join('input-attachments', fileName)
       next.availableToAgent = true
-      delete next.contentBase64
-      delete next.dataUrl
-      delete next.base64
-      delete next.bytesBase64
+      removeInlineAndDownloadSecrets(next)
     }
     materialized.push(next)
   }
@@ -259,7 +312,7 @@ export async function runCodexWorkItemExecutor({ workItem, outputDir, env = proc
   const schemaFile = path.join(artifactDir, 'codex-result.schema.json')
   const resultFile = path.join(artifactDir, 'codex-result.json')
   await writeJson(schemaFile, resultSchema())
-  const executableWorkItem = await materializeAttachments(workItem, artifactDir)
+  const executableWorkItem = await materializeAttachments(workItem, artifactDir, env)
   await runCodex({ prompt: promptForWorkItem(executableWorkItem, artifactDir), outputDir: artifactDir, schemaFile, resultFile, env })
   const result = parseJsonOutput(await fs.readFile(resultFile, 'utf8').catch(() => ''))
   const artifacts = await assertArtifactFiles(Array.isArray(result.artifacts) ? result.artifacts : [], artifactDir)
