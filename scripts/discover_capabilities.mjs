@@ -40,9 +40,11 @@ function parseSkillMarkdown(raw, fallbackName) {
 
 async function walk(rootDir, { maxDepth = 4, maxFiles = 300 } = {}) {
   const root = path.resolve(rootDir)
-  const results = []
+  const skillFiles = []
+  const jsonFiles = []
+  const caseFiles = []
   async function visit(dir, depth) {
-    if (depth > maxDepth || results.length >= maxFiles) return
+    if (depth > maxDepth) return
     let entries = []
     try {
       entries = await fs.readdir(dir, { withFileTypes: true })
@@ -50,16 +52,20 @@ async function walk(rootDir, { maxDepth = 4, maxFiles = 300 } = {}) {
       return
     }
     for (const entry of entries) {
-      if (results.length >= maxFiles) return
       if (entry.isDirectory()) {
         if (!SKIP_DIRS.has(entry.name)) await visit(path.join(dir, entry.name), depth + 1)
       } else if (entry.isFile()) {
-        results.push(path.join(dir, entry.name))
+        const filePath = path.join(dir, entry.name)
+        const extension = path.extname(entry.name).toLowerCase()
+        const segments = filePath.split(path.sep).map((segment) => segment.toLowerCase())
+        if (entry.name === 'SKILL.md') skillFiles.push(filePath)
+        else if (extension === '.json') jsonFiles.push(filePath)
+        else if (CASE_EXTENSIONS.has(extension) && segments.some((segment) => ['case', 'cases', 'assets'].includes(segment))) caseFiles.push(filePath)
       }
     }
   }
   await visit(root, 0)
-  return results
+  return [...skillFiles, ...jsonFiles, ...caseFiles].slice(0, Math.max(0, maxFiles))
 }
 
 function uniquePaths(paths) {

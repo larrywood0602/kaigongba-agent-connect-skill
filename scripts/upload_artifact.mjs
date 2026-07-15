@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { apiRequest, arg, mimeFromName, numberArg, parseArgs, readConnectionConfig, required, uploadFileToUrl } from './lib.mjs'
+import { apiRequest, arg, artifactApiRequest, artifactRequestPolicy, mimeFromName, numberArg, parseArgs, readConnectionConfig, redactLocalResult, required, uploadFileToUrl } from './lib.mjs'
+import { cleanupStableArtifactSnapshot, stableArtifactSnapshot, withVerifiedStableArtifact } from './runtime_activity.mjs'
 
 const args = parseArgs()
+const requestPolicy = artifactRequestPolicy(args)
 const config = await readConnectionConfig()
 const runId = required(arg(args, ['run-id', 'runId']), '--run-id')
 const nodeKey = required(arg(args, ['node-key', 'nodeKey']), '--node-key')
@@ -23,80 +25,107 @@ if (filePath) {
 const name = String(arg(args, 'name', filePath ? path.basename(String(filePath)) : '阶段结果文件'))
 const type = String(arg(args, 'type', path.extname(name).slice(1) || 'file'))
 const mimeType = String(arg(args, ['mime-type', 'mimeType'], mimeFromName(name, type)))
-const sizeBytes = numberArg(arg(args, ['size-bytes', 'sizeBytes']), fileStats?.size || 0)
+let sizeBytes = numberArg(arg(args, ['size-bytes', 'sizeBytes']), fileStats?.size || 0)
+let sha256
 const externalArtifactId = String(arg(args, ['external-artifact-id', 'externalArtifactId'], `${runId}-${nodeKey}-${name}`))
 
 let externalUrl = arg(args, ['external-url', 'externalUrl'])
 let uploadId = arg(args, ['upload-id', 'uploadId'])
-let uploadUrl = ''
 const shouldRequestUpload = Boolean(!externalUrl && !uploadId)
-if (shouldRequestUpload) {
-  const upload = await apiRequest('/api/artifacts/upload-url', {
-    method: 'POST',
-    body: JSON.stringify({
-      connectionId: arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId),
-      runId,
-      nodeKey,
+let snapshot = null
+if (shouldRequestUpload && filePath) {
+  const trustedRoot = path.dirname(path.resolve(String(filePath)))
+  snapshot = {
+    outputDir: trustedRoot,
+    ...await stableArtifactSnapshot({
+      outputDir: trustedRoot,
+      file: String(filePath),
+      stableWindowMs: numberArg(process.env.KAIGONGBA_ARTIFACT_STABLE_WINDOW_MS, 250),
+      pollIntervalMs: numberArg(process.env.KAIGONGBA_ARTIFACT_STABLE_POLL_INTERVAL_MS, 50),
+    }),
+  }
+  sizeBytes = snapshot.sizeBytes
+  sha256 = snapshot.sha256
+}
+
+const submit = async (bytes) => {
+  let uploadUrl = ''
+  if (shouldRequestUpload) {
+    const upload = await artifactApiRequest('/api/artifacts/upload-url', {
+      method: 'POST',
+      body: JSON.stringify({
+        connectionId: arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId),
+        runId,
+        nodeKey,
+        name,
+        type,
+        mimeType,
+        sizeBytes,
+        sha256,
+      }),
+    }, requestPolicy, 'artifact_upload_url')
+    uploadUrl = upload.uploadUrl
+    externalUrl = upload.externalUrl || upload.downloadUrl || upload.uploadUrl
+    uploadId = upload.uploadId
+  }
+
+  const uploadResult = shouldRequestUpload
+    ? await uploadFileToUrl({ bytes, uploadUrl: uploadUrl || externalUrl, mimeType, policy: requestPolicy })
+    : { uploaded: false, skippedReason: filePath ? 'external_artifact_url_provided' : 'no_file' }
+  const payload = {
+    connectionId: arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId),
+    serviceSopId: arg(args, ['service-sop-id', 'serviceSopId'], process.env.KAIGONGBA_SERVICE_SOP_ID || config.serviceSopId),
+    nodeKey,
+    event: 'artifact.created',
+    status: 'submitted',
+    sequence,
+    idempotencyKey: idempotencyKey || `${runId}-${nodeKey}-artifact-${sequence}`,
+    artifact: {
+      externalArtifactId,
       name,
       type,
       mimeType,
       sizeBytes,
-    }),
-  })
-  uploadUrl = upload.uploadUrl
-  externalUrl = upload.externalUrl || upload.downloadUrl || upload.uploadUrl
-  uploadId = upload.uploadId
-}
+      sha256,
+      externalUrl,
+      uploadId,
+    },
+  }
 
-const uploadResult = shouldRequestUpload
-  ? await uploadFileToUrl({ filePath, uploadUrl: uploadUrl || externalUrl, mimeType })
-  : { uploaded: false, skippedReason: filePath ? 'external_artifact_url_provided' : 'no_file' }
+  const sourceAgentId = arg(args, ['source-agent-id', 'sourceAgentId'])
+  const sourceAgentName = arg(args, ['source-agent-name', 'sourceAgentName'])
+  if (sourceAgentId || sourceAgentName) payload.sourceAgent = { id: sourceAgentId, name: sourceAgentName }
+  const reporterId = arg(args, ['reported-by-agent-id', 'reportedByAgentId'], process.env.KAIGONGBA_MAIN_AGENT_ID || config.mainAgent?.externalAgentId)
+  const reporterName = arg(args, ['reported-by-agent-name', 'reportedByAgentName'], process.env.KAIGONGBA_MAIN_AGENT_NAME || config.mainAgent?.name)
+  if (reporterId || reporterName) payload.reportedByAgent = { id: reporterId, name: reporterName }
 
-const payload = {
-  connectionId: arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId),
-  serviceSopId: arg(args, ['service-sop-id', 'serviceSopId'], process.env.KAIGONGBA_SERVICE_SOP_ID || config.serviceSopId),
-  nodeKey,
-  event: 'artifact.created',
-  status: 'submitted',
-  sequence,
-  idempotencyKey: idempotencyKey || `${runId}-${nodeKey}-artifact-${sequence}`,
-  artifact: {
-    externalArtifactId,
-    name,
-    type,
-    mimeType,
-    sizeBytes,
-    externalUrl,
-    uploadId,
-  },
-}
+  for (const key of Object.keys(payload)) {
+    if (payload[key] === undefined || payload[key] === true || payload[key] === '') delete payload[key]
+  }
+  for (const key of Object.keys(payload.artifact)) {
+    if (payload.artifact[key] === undefined || payload.artifact[key] === true || payload.artifact[key] === '') delete payload.artifact[key]
+  }
 
-const sourceAgentId = arg(args, ['source-agent-id', 'sourceAgentId'])
-const sourceAgentName = arg(args, ['source-agent-name', 'sourceAgentName'])
-if (sourceAgentId || sourceAgentName) payload.sourceAgent = { id: sourceAgentId, name: sourceAgentName }
-
-const reporterId = arg(args, ['reported-by-agent-id', 'reportedByAgentId'], process.env.KAIGONGBA_MAIN_AGENT_ID || config.mainAgent?.externalAgentId)
-const reporterName = arg(args, ['reported-by-agent-name', 'reportedByAgentName'], process.env.KAIGONGBA_MAIN_AGENT_NAME || config.mainAgent?.name)
-if (reporterId || reporterName) payload.reportedByAgent = { id: reporterId, name: reporterName }
-
-for (const key of Object.keys(payload)) {
-  if (payload[key] === undefined || payload[key] === true || payload[key] === '') delete payload[key]
-}
-for (const key of Object.keys(payload.artifact)) {
-  if (payload.artifact[key] === undefined || payload.artifact[key] === true || payload.artifact[key] === '') delete payload.artifact[key]
-}
-
-const result = await apiRequest(`/api/workflow-runs/${encodeURIComponent(runId)}/events`, {
-  method: 'POST',
-  body: JSON.stringify(payload),
-})
-
-let completed = null
-if (uploadResult.uploaded && result.artifact?.id) {
-  completed = await apiRequest(`/api/artifacts/${encodeURIComponent(result.artifact.id)}/complete`, {
+  const result = await apiRequest(`/api/workflow-runs/${encodeURIComponent(runId)}/events`, {
     method: 'POST',
-    body: JSON.stringify({ uploadId, uploaded: true, uploadStatus: uploadResult.status }),
+    body: JSON.stringify(payload),
   })
+  let completed = null
+  if (uploadResult.uploaded && result.artifact?.id) {
+    completed = await artifactApiRequest(`/api/artifacts/${encodeURIComponent(result.artifact.id)}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ uploadId, uploaded: true, uploadStatus: uploadResult.status }),
+    }, requestPolicy, 'artifact_complete')
+  }
+  return { ...result, artifact: result.artifact || payload.artifact, upload: uploadResult, completed }
 }
 
-process.stdout.write(`${JSON.stringify({ ...result, artifact: result.artifact || payload.artifact, upload: uploadResult, completed }, null, 2)}\n`)
+let output
+try {
+  output = snapshot
+    ? await withVerifiedStableArtifact(snapshot, ({ bytes }) => submit(bytes))
+    : await submit(undefined)
+} finally {
+  if (snapshot) await cleanupStableArtifactSnapshot(snapshot)
+}
+process.stdout.write(`${JSON.stringify(redactLocalResult(output), null, 2)}\n`)

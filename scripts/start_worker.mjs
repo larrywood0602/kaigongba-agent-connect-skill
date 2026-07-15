@@ -3,11 +3,27 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { forbiddenExecutorEnvironmentName, forbiddenPlatformCredentialEnvironmentName, safeEnvironmentAdditions } from './environment_security.mjs'
 import { arg, parseArgs, readConnectionConfig, writeJson } from './lib.mjs'
 import { runWorkerDaemon } from './worker_daemon.mjs'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const SKILL_DIR = path.resolve(SCRIPT_DIR, '..')
+const BASE_WORKER_ENV_NAMES = [
+  'PATH', 'HOME', 'USER', 'LOGNAME', 'SHELL', 'TMPDIR', 'TMP', 'TEMP',
+  'LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE',
+  'CODEX_HOME', 'CODEX_EXECUTABLE', 'CODEX_MODEL', 'CODEX_EXEC_ARGS', 'INIT_CWD',
+  'KAIGONGBA_EXECUTOR_ENV_ALLOWLIST',
+  'KAIGONGBA_WORKER_POLL_INTERVAL_MS', 'KAIGONGBA_WORKER_ERROR_INTERVAL_MS',
+  'KAIGONGBA_EXECUTOR_TIMEOUT_MS', 'KAIGONGBA_EXECUTOR_IDLE_TIMEOUT_MS',
+  'KAIGONGBA_EXECUTOR_KILL_GRACE_MS', 'KAIGONGBA_EXECUTOR_JSONL',
+  'KAIGONGBA_CALLBACK_REQUEST_TIMEOUT_MS', 'KAIGONGBA_WORK_ITEM_LEASE_RENEW_INTERVAL_MS',
+  'KAIGONGBA_PROGRESS_HEARTBEAT_INTERVAL_MS', 'KAIGONGBA_CODEX_OUTPUT_DIR',
+  'KAIGONGBA_ACTIVITY_POLL_INTERVAL_MS', 'KAIGONGBA_ARTIFACT_STABLE_WINDOW_MS',
+  'KAIGONGBA_ARTIFACT_STABLE_POLL_INTERVAL_MS', 'KAIGONGBA_AGENT_SOURCE_DIR',
+  'KAIGONGBA_ARTIFACT_REQUEST_TIMEOUT_MS', 'KAIGONGBA_ARTIFACT_RETRY_DELAYS_MS',
+]
+const FOREGROUND_STALE_CONNECTION_NAMES = ['KAIGONGBA_CONNECTION_ID', 'KAIGONGBA_API_BASE_URL']
 
 function defaultOutputDir() {
   return path.resolve(SKILL_DIR, '.kaigongba/runtime')
@@ -22,6 +38,43 @@ function boolArg(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback
   if (value === true) return true
   return ['1', 'true', 'yes', 'y', 'on'].includes(String(value).trim().toLowerCase())
+}
+
+export function workerProcessEnvironment(source = process.env, additions = {}) {
+  const names = new Set(BASE_WORKER_ENV_NAMES)
+  for (const name of Object.keys(source)) {
+    if (/^LC_[A-Za-z0-9_]+$/.test(name)) names.add(name)
+  }
+  for (const name of String(source.KAIGONGBA_EXECUTOR_ENV_ALLOWLIST || '').split(',').map((item) => item.trim()).filter(Boolean)) {
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !forbiddenExecutorEnvironmentName(name)) names.add(name)
+  }
+  const env = {}
+  for (const name of names) {
+    if (source[name] !== undefined && !forbiddenExecutorEnvironmentName(name)) env[name] = source[name]
+  }
+  return { ...env, ...safeEnvironmentAdditions(additions) }
+}
+
+async function withoutForegroundPlatformCredentials(callback) {
+  const names = new Set([
+    ...Object.keys(process.env).filter(forbiddenPlatformCredentialEnvironmentName),
+    ...FOREGROUND_STALE_CONNECTION_NAMES,
+  ])
+  const previous = new Map(
+    [...names].map((name) => [name, {
+      existed: Object.prototype.hasOwnProperty.call(process.env, name),
+      value: process.env[name],
+    }]),
+  )
+  for (const name of names) delete process.env[name]
+  try {
+    return await callback()
+  } finally {
+    for (const [name, state] of previous) {
+      if (state.existed) process.env[name] = state.value
+      else delete process.env[name]
+    }
+  }
 }
 
 async function readPid(pidFile) {
@@ -80,7 +133,8 @@ function appendOption(argv, args, names, flagName) {
 
 export function workerDaemonArgs(args = {}, paths = {}) {
   const workerScript = path.join(SCRIPT_DIR, 'worker_daemon.mjs')
-  const outputDir = path.resolve(String(paths.outputDir || arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
+  const explicitOutputDir = paths.outputDir || arg(args, ['output-dir', 'outputDir'], undefined)
+  const outputDir = path.resolve(String(explicitOutputDir || defaultOutputDir()))
   const statusFile = path.resolve(String(paths.statusFile || arg(args, ['status-file', 'statusFile'], path.join(outputDir, 'worker-status.json'))))
   const argv = [workerScript, '--output-dir', outputDir, '--status-file', statusFile]
   appendOption(argv, args, ['connection-id', 'connectionId'], 'connection-id')
@@ -103,7 +157,8 @@ export async function startWorker(args = {}) {
   if (!executorCommand) throw new Error('Pass --executor-command or set KAIGONGBA_EXECUTOR_COMMAND to the external Agent runner')
   if (!compact(config.connectionId)) throw new Error('No connectionId found. Run install_and_connect.mjs or bootstrap_connection.mjs first.')
 
-  const outputDir = path.resolve(String(arg(args, ['output-dir', 'outputDir'], process.env.KAIGONGBA_WORKER_OUTPUT_DIR || defaultOutputDir())))
+  const explicitOutputDir = arg(args, ['output-dir', 'outputDir'], process.env.KAIGONGBA_WORKER_OUTPUT_DIR)
+  const outputDir = path.resolve(String(explicitOutputDir || defaultOutputDir()))
   const pidFile = path.resolve(String(arg(args, ['pid-file', 'pidFile'], path.join(outputDir, 'worker.pid'))))
   const statusFile = path.resolve(String(arg(args, ['status-file', 'statusFile'], path.join(outputDir, 'worker-status.json'))))
   const foreground = boolArg(arg(args, 'foreground', false), false)
@@ -125,7 +180,9 @@ export async function startWorker(args = {}) {
   }
 
   if (foreground) {
-    const result = await runWorkerDaemon({ ...args, outputDir, statusFile, executorCommand })
+    const result = await withoutForegroundPlatformCredentials(
+      () => runWorkerDaemon({ ...args, outputDir, statusFile, executorCommand }),
+    )
     return { ...result, foreground: true, pidFile, statusFile }
   }
 
@@ -134,11 +191,10 @@ export async function startWorker(args = {}) {
     cwd: SKILL_DIR,
     detached: true,
     stdio: 'ignore',
-    env: {
-      ...process.env,
+    env: workerProcessEnvironment(process.env, {
       KAIGONGBA_EXECUTOR_COMMAND: executorCommand,
       KAIGONGBA_CONNECTION_CONFIG: process.env.KAIGONGBA_CONNECTION_CONFIG || path.join(SKILL_DIR, '.kaigongba/connection.json'),
-    },
+    }),
   })
   child.unref()
   await fs.writeFile(pidFile, `${child.pid}\n`, 'utf8')

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -40,6 +40,11 @@ function queuedWorkItem() {
     status: 'queued',
     payload: {
       requirement: { goal: '生成一份任务成果' },
+      execution: {
+        hardTimeoutMs: 3 * 60 * 60 * 1000,
+        idleTimeoutMs: 15 * 60 * 1000,
+        maxHardTimeoutMs: 6 * 60 * 60 * 1000,
+      },
       callback: {
         runId: 'order_daemon_1',
         connectionId: 'conn_daemon',
@@ -143,6 +148,8 @@ describe('worker daemon', () => {
       runs: 1,
       lastRun: { ok: true, workItemId: 'work_daemon_1' },
     })
+    const lastRun = JSON.parse(await readFile(join(tempDir, '.kaigongba/runtime/last-run-result.json'), 'utf8'))
+    expect(lastRun.executionMetrics.timeoutSource).toBe('work_item')
   })
 
   it('reloads connection config between polls so relinked agents bind without restart', async () => {
@@ -220,5 +227,32 @@ describe('worker daemon', () => {
       '/api/agent/work-items?connectionId=conn_new',
       '/api/agent/work-items/work_daemon_1/claim',
     ]))
+  })
+
+  it('runs the executor from the runtime directory when the daemon cwd was replaced', async () => {
+    const outputDir = join(tempDir, '.kaigongba/runtime')
+    const staleCwd = join(tempDir, 'stale-cwd')
+    await mkdir(staleCwd, { recursive: true })
+    process.chdir(staleCwd)
+    await rm(staleCwd, { recursive: true, force: true })
+
+    const executorFile = join(tempDir, 'executor-cwd.mjs')
+    await writeFile(
+      executorFile,
+      `process.stdin.resume()\nprocess.stdin.on('end', () => {\n  console.log(JSON.stringify({\n    progressEvents: [{ progress: 5, message: process.cwd() }],\n    finalMessage: process.env.KAIGONGBA_CODEX_OUTPUT_DIR\n  }))\n})\n`,
+      'utf8',
+    )
+
+    const result = await runWorkerDaemon({
+      outputDir,
+      executorCommand: `node "${executorFile}"`,
+      pollIntervalMs: 1,
+      maxIterations: 2,
+    })
+
+    expect(result).toMatchObject({ ok: true, runs: 1, failures: 0 })
+    const lastRun = JSON.parse(await readFile(join(outputDir, 'last-run-result.json'), 'utf8'))
+    expect(await realpath(lastRun.executorResult.progressEvents[0].message)).toBe(await realpath(outputDir))
+    expect(lastRun.executorResult.finalMessage).toBe(await realpath(join(outputDir, 'codex-artifacts')))
   })
 })

@@ -6,22 +6,56 @@ import { apiRequest, arg, numberArg, parseArgs, readConnectionConfig, writeJson 
 
 export const DEFAULT_WORK_ITEM_LEASE_SECONDS = 15 * 60
 
-function defaultOutputDir() {
-  return path.resolve(process.cwd(), '.kaigongba/runtime')
+function safeCwd(fallback = process.env.HOME || '/tmp') {
+  try {
+    return process.cwd()
+  } catch {
+    return fallback
+  }
 }
 
-export function selectWorkItem(workItems = [], explicitId = '') {
+function defaultOutputDir() {
+  return path.resolve(safeCwd(), '.kaigongba/runtime')
+}
+
+function outputDirArg(args = {}) {
+  const explicit = arg(args, ['output-dir', 'outputDir'], undefined)
+  return path.resolve(String(explicit || defaultOutputDir()))
+}
+
+function attemptsRemaining(workItem = {}) {
+  const attemptCount = Number(workItem.attemptCount ?? workItem.attempt_count ?? 0)
+  const maxAttempts = Number(workItem.maxAttempts ?? workItem.max_attempts ?? Number.POSITIVE_INFINITY)
+  if (!Number.isFinite(maxAttempts)) return true
+  return (Number.isFinite(attemptCount) ? attemptCount : 0) < maxAttempts
+}
+
+function leaseExpired(workItem = {}, now = Date.now()) {
+  const raw = compact(workItem.leaseExpiresAt ?? workItem.lease_expires_at)
+  if (!raw) return true
+  const expiresAt = Date.parse(raw)
+  return !Number.isFinite(expiresAt) || expiresAt < now
+}
+
+export function isClaimableCandidate(workItem = {}, now = Date.now()) {
+  if (!attemptsRemaining(workItem)) return false
+  if (['queued', 'revision_requested', 'revising'].includes(compact(workItem.status))) return true
+  if (['claimed', 'running'].includes(compact(workItem.status))) return leaseExpired(workItem, now)
+  return false
+}
+
+export function selectWorkItem(workItems = [], explicitId = '', now = Date.now()) {
   if (explicitId) {
     const selected = workItems.find((item) => item.id === explicitId)
     if (!selected) throw new Error(`Work item ${explicitId} was not found in the current queue`)
     return selected
   }
   return (
-    workItems.find((item) => item.status === 'queued')
-    ?? workItems.find((item) => item.status === 'revision_requested')
-    ?? workItems.find((item) => item.status === 'revising')
-    ?? workItems.find((item) => item.status === 'claimed')
-    ?? workItems.find((item) => item.status === 'running')
+    workItems.find((item) => item.status === 'queued' && isClaimableCandidate(item, now))
+    ?? workItems.find((item) => item.status === 'revision_requested' && isClaimableCandidate(item, now))
+    ?? workItems.find((item) => item.status === 'revising' && isClaimableCandidate(item, now))
+    ?? workItems.find((item) => item.status === 'claimed' && isClaimableCandidate(item, now))
+    ?? workItems.find((item) => item.status === 'running' && isClaimableCandidate(item, now))
     ?? null
   )
 }
@@ -70,7 +104,7 @@ export async function claimWorkItem(args = {}) {
     method: 'POST',
     body: JSON.stringify({ workerId, leaseSeconds }),
   })
-  const outputDir = path.resolve(String(arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
+  const outputDir = outputDirArg(args)
   await writeJson(path.join(outputDir, 'claimed-work-item.json'), result.workItem)
   await writeJson(path.join(outputDir, 'current-work-item.json'), result.workItem)
   return {

@@ -3,8 +3,21 @@ import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { apiRequest, arg, parseArgs, readConnectionConfig, writeJson } from './lib.mjs'
 
+function safeCwd(fallback = process.env.HOME || '/tmp') {
+  try {
+    return process.cwd()
+  } catch {
+    return fallback
+  }
+}
+
 function defaultOutputDir() {
-  return path.resolve(process.cwd(), '.kaigongba/runtime')
+  return path.resolve(safeCwd(), '.kaigongba/runtime')
+}
+
+function outputDirArg(args = {}) {
+  const explicit = arg(args, ['output-dir', 'outputDir'], undefined)
+  return path.resolve(String(explicit || defaultOutputDir()))
 }
 
 export async function runRuntimeTick(args = {}) {
@@ -15,7 +28,7 @@ export async function runRuntimeTick(args = {}) {
   const workItemsResult = await apiRequest(`/api/agent/work-items?connectionId=${encodeURIComponent(connectionId)}`)
   const pendingRuns = Array.isArray(result.runs) ? result.runs : []
   const pendingWorkItems = Array.isArray(workItemsResult.workItems) ? workItemsResult.workItems : []
-  const outputDir = path.resolve(String(arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
+  const outputDir = outputDirArg(args)
   await writeJson(path.join(outputDir, 'pending-runs.json'), pendingRuns)
   await writeJson(path.join(outputDir, 'pending-work-items.json'), pendingWorkItems)
   await writeJson(path.join(outputDir, 'latest-state.json'), {

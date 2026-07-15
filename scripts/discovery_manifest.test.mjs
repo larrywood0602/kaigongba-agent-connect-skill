@@ -1,5 +1,6 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { discoverCapabilities } from './discover_capabilities.mjs'
@@ -8,6 +9,7 @@ import { resolveMainAgent } from './lib.mjs'
 
 let tempDir
 let previousCwd
+const SKILL_DIR = join(fileURLToPath(new URL('.', import.meta.url)), '..')
 
 beforeEach(async () => {
   previousCwd = process.cwd()
@@ -31,6 +33,18 @@ async function writeSkill(dirName, name, description) {
 }
 
 describe('kaigongba agent capability discovery', () => {
+  it('packages the streaming executor runtime as connector 0.3.9', async () => {
+    const packageJson = JSON.parse(await readFile(join(SKILL_DIR, 'package.json'), 'utf8'))
+
+    expect(packageJson.version).toBe('0.3.9')
+    expect(packageJson.files).toEqual(expect.arrayContaining([
+      'references/connection-rotation.md',
+      'scripts/executor_protocol.mjs',
+      'scripts/report_progress.mjs',
+      'scripts/runtime_activity.mjs',
+    ]))
+  })
+
   it('defaults to the current agent project and does not scan global Codex skill libraries', async () => {
     await writeSkill('seller-agent', 'seller-agent', '真实卖方 Agent 技能')
     const cwd = process.cwd()
@@ -40,6 +54,21 @@ describe('kaigongba agent capability discovery', () => {
     expect(discovery.sourceDirs).toEqual([cwd])
     expect(discovery.skills.map((skill) => skill.name)).toEqual(['seller-agent'])
     expect(discovery.skills.some((skill) => String(skill.name).includes('imagegen'))).toBe(false)
+  })
+
+  it('does not spend the discovery file budget on unrelated files before finding SKILL.md', async () => {
+    const skillDir = join(tempDir, 'budgeted-skill')
+    await mkdir(skillDir, { recursive: true })
+    await writeFile(join(skillDir, '000-noise.txt'), 'not a capability', 'utf8')
+    await writeFile(
+      join(skillDir, 'SKILL.md'),
+      '---\nname: budgeted-skill\ndescription: 必须在普通文件很多时仍被发现\n---\n\n# Budgeted Skill\n',
+      'utf8',
+    )
+
+    const discovery = await discoverCapabilities({ maxDepth: 3, maxFiles: 1 })
+
+    expect(discovery.skills.map((skill) => skill.name)).toContain('budgeted-skill')
   })
 
   it('keeps multiple discovered skills as service capabilities instead of expanding each skill into a SOP node', async () => {

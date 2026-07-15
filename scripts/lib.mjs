@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { randomUUID } from 'node:crypto'
 
 export function parseArgs(argv = process.argv.slice(2)) {
   const args = { _: [] }
@@ -160,19 +161,49 @@ export async function readConnectionConfig() {
 
 export async function writeConnectionConfig(config) {
   const filePath = connectionConfigPath()
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
+  const directory = path.dirname(path.resolve(filePath))
+  await fs.mkdir(directory, { recursive: true, mode: 0o700 })
+  await fs.chmod(directory, 0o700)
+  const temporaryFile = path.join(directory, `.connection.${process.pid}.${randomUUID()}.tmp`)
+  let handle
+  try {
+    handle = await fs.open(temporaryFile, 'wx', 0o600)
+    await handle.writeFile(`${JSON.stringify(config, null, 2)}\n`, 'utf8')
+    await handle.sync()
+    await handle.close()
+    handle = null
+    await fs.rename(temporaryFile, filePath)
+    await fs.chmod(filePath, 0o600)
+    await syncDirectory(directory)
+  } catch (error) {
+    await handle?.close().catch(() => undefined)
+    await fs.unlink(temporaryFile).catch(() => undefined)
+    throw error
+  }
   return filePath
 }
 
-export async function writeJson(filePath, payload) {
+async function syncDirectory(directory) {
+  let handle
+  try {
+    handle = await fs.open(directory, 'r')
+    await handle.sync()
+  } catch (error) {
+    if (!['EINVAL', 'ENOTSUP', 'EISDIR'].includes(error?.code)) throw error
+  } finally {
+    await handle?.close().catch(() => undefined)
+  }
+}
+
+export async function writeJson(filePath, payload, options = {}) {
   const serialized = `${JSON.stringify(payload, null, 2)}\n`
   if (!filePath || filePath === '-') {
     process.stdout.write(serialized)
     return
   }
   await fs.mkdir(path.dirname(path.resolve(filePath)), { recursive: true })
-  await fs.writeFile(filePath, serialized, 'utf8')
+  await fs.writeFile(filePath, serialized, { encoding: 'utf8', mode: options.mode })
+  if (options.mode !== undefined) await fs.chmod(filePath, options.mode)
 }
 
 export function apiBase(config = {}) {
@@ -199,31 +230,141 @@ export async function apiRequest(apiPath, options = {}) {
 
   const response = await fetch(url, { ...options, headers })
   const raw = await response.text()
-  const payload = raw ? JSON.parse(raw) : {}
-  if (!response.ok) {
-    const code = payload.code || response.statusText || 'request_failed'
-    const message = payload.message || raw || `HTTP ${response.status}`
-    throw new Error(`${response.status} ${code}: ${message}`)
+  let payload = {}
+  let parseError = null
+  if (raw) {
+    try {
+      payload = JSON.parse(raw)
+    } catch (error) {
+      parseError = error
+    }
   }
+  if (!response.ok) {
+    const code = payload?.code || 'request_failed'
+    const message = payload?.message || raw || `HTTP ${response.status}`
+    const error = new Error(`${response.status} ${code}: ${message}`)
+    error.status = response.status
+    error.code = code
+    throw error
+  }
+  if (parseError) throw parseError
   return payload
 }
 
-export async function uploadFileToUrl({ filePath, uploadUrl, mimeType }) {
-  if (!filePath) return { uploaded: false, skippedReason: 'no_file' }
+const DEFAULT_ARTIFACT_REQUEST_TIMEOUT_MS = 15_000
+const DEFAULT_ARTIFACT_RETRY_DELAYS_MS = [100, 300, 900]
+
+export function artifactRequestPolicy(args = {}, env = process.env) {
+  const timeoutValue = arg(
+    args,
+    ['artifact-request-timeout-ms', 'artifactRequestTimeoutMs'],
+    env.KAIGONGBA_ARTIFACT_REQUEST_TIMEOUT_MS,
+  )
+  const retryValue = arg(
+    args,
+    ['artifact-retry-delays-ms', 'artifactRetryDelaysMs'],
+    env.KAIGONGBA_ARTIFACT_RETRY_DELAYS_MS,
+  )
+  const values = retryValue === undefined
+    ? DEFAULT_ARTIFACT_RETRY_DELAYS_MS
+    : (Array.isArray(retryValue) ? retryValue : String(retryValue).split(','))
+  return {
+    timeoutMs: Math.max(1, numberArg(timeoutValue, DEFAULT_ARTIFACT_REQUEST_TIMEOUT_MS)),
+    retryDelaysMs: values.map((value) => Math.max(0, numberArg(value, 0))),
+  }
+}
+
+function transientArtifactRequestError(error) {
+  if (error?.code === 'artifact_request_timeout') return true
+  if (Number.isFinite(error?.status)) {
+    return error.status === 408 || error.status === 429 || error.status >= 500
+  }
+  return true
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+async function withArtifactRequestRetry(operation, policy = {}, phase = 'artifact_request') {
+  const timeoutMs = Math.max(1, numberArg(policy.timeoutMs, DEFAULT_ARTIFACT_REQUEST_TIMEOUT_MS))
+  const retryDelaysMs = Array.isArray(policy.retryDelaysMs)
+    ? policy.retryDelaysMs
+    : DEFAULT_ARTIFACT_RETRY_DELAYS_MS
+  let lastError
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt += 1) {
+    if (attempt > 0) await wait(Math.max(0, numberArg(retryDelaysMs[attempt - 1], 0)))
+    const controller = new AbortController()
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, timeoutMs)
+    try {
+      return await operation(controller.signal)
+    } catch (error) {
+      if (timedOut) {
+        lastError = new Error(`Artifact request ${phase} exceeded ${timeoutMs}ms`)
+        lastError.code = 'artifact_request_timeout'
+        lastError.details = { phase, timeoutMs }
+      } else {
+        lastError = error
+      }
+      if (!transientArtifactRequestError(lastError)) throw lastError
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  throw lastError
+}
+
+export async function artifactApiRequest(apiPath, options = {}, policy = {}, phase = 'artifact_api') {
+  return withArtifactRequestRetry(
+    (signal) => apiRequest(apiPath, { ...options, signal }),
+    policy,
+    phase,
+  )
+}
+
+export async function uploadFileToUrl({ bytes, uploadUrl, mimeType, policy = {} }) {
+  if (bytes === undefined || bytes === null) return { uploaded: false, skippedReason: 'no_file' }
   if (!uploadUrl || !String(uploadUrl).startsWith('http')) {
-    return { uploaded: false, skippedReason: 'non_http_upload_url', uploadUrl }
+    return { uploaded: false, skippedReason: 'non_http_upload_url' }
   }
-  const bytes = await fs.readFile(filePath)
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: mimeType ? { 'Content-Type': mimeType } : {},
-    body: bytes,
-  })
-  if (!response.ok) {
-    const raw = await response.text()
-    throw new Error(`Artifact upload failed: HTTP ${response.status} ${raw || response.statusText}`)
+  return withArtifactRequestRetry(async (signal) => {
+    const response = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: mimeType ? { 'Content-Type': mimeType } : {},
+      body: bytes,
+      signal,
+    })
+    if (!response.ok) {
+      const raw = await response.text()
+      const error = new Error(`Artifact upload failed: HTTP ${response.status} ${raw || response.statusText}`)
+      error.status = response.status
+      error.code = 'artifact_upload_failed'
+      throw error
+    }
+    return { uploaded: true, status: response.status }
+  }, policy, 'artifact_upload_put')
+}
+
+export function redactLocalResult(value, key = '') {
+  if (/(?:url|uri)$/i.test(key)) return undefined
+  if (Array.isArray(value)) return value.map((item) => redactLocalResult(item)).filter((item) => item !== undefined)
+  if (value && typeof value === 'object') {
+    const output = {}
+    for (const [childKey, childValue] of Object.entries(value)) {
+      const redacted = redactLocalResult(childValue, childKey)
+      if (redacted !== undefined) output[childKey] = redacted
+    }
+    return output
   }
-  return { uploaded: true, status: response.status, uploadUrl }
+  if (typeof value !== 'string') return value
+  return value
+    .replace(/(\bBearer\s+)[^\s,;]+/gi, '$1[REDACTED]')
+    .replace(/\b(?:kgb_agent_|kgbc_)[A-Za-z0-9_-]+\b/g, '[REDACTED]')
+    .replace(/([?&][^?&#=\s]*(?:token|code|key|signature)=)[^&#\s]+/gi, '$1[REDACTED]')
 }
 
 export function defaultStatus(eventType) {

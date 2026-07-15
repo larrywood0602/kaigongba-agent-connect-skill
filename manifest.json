@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect",
-  "version": "0.3.7",
+  "version": "0.3.9",
   "kind": "skill_package",
   "distribution": {
     "preferred": "github_npx",
@@ -26,17 +26,17 @@
     "manifest.json": {
       "required": true
     },
+    "package.json": {
+      "required": true,
+      "sha256": "03672bae0cb4c2312bc4988facd99abe8f47cbd31caee1d207835bc32c406e7e"
+    },
     "SKILL.md": {
       "required": true,
-      "sha256": "f26693e84fc7d6cd546e01bb606100a9423482227b22e89b9782e8927faa41ac"
+      "sha256": "e8897b3548974dc844d3ec2ed20876ddfd627796bf59efcd86f3199bcf7b3773"
     },
     "README.md": {
       "required": true,
-      "sha256": "eb81cce79e9924497fcabec554da4b7fdb2535a6540a1711de28030207e8474d"
-    },
-    "package.json": {
-      "required": true,
-      "sha256": "1fd18882631b4f7ca2fd182efd07acfacde9eb50ee7636e24120e83281ecccd0"
+      "sha256": "e88ed8ed7af4d8f04d6dcb5e2c2ba3f44fefe91b1d175c72a273f01b30112884"
     },
     "agents/openai.yaml": {
       "required": true,
@@ -45,6 +45,10 @@
     "assets/manifest.example.json": {
       "required": true,
       "sha256": "eb3cc86a7c6a94ffa4e9cae6e7fdf9a984ff6ffd9f6cfc29d066903acace331b"
+    },
+    "references/connection-rotation.md": {
+      "required": true,
+      "sha256": "2bffc1cc31cd1d98eb7791d54fa74c6335fde537755729c34dbed29ca7c105d5"
     },
     "references/api.md": {
       "required": true,
@@ -68,7 +72,7 @@
     },
     "scripts/claim_work_item.mjs": {
       "required": true,
-      "sha256": "7bfbf60856b06dd1380230bc9b5ff81b138e6958b9cdee4cab8f2c53efe8177c"
+      "sha256": "989a6df49c8ca59d86e254fbefdd5ba8e9c1ffeecca644870f81e9efa7e60175"
     },
     "scripts/collect_manifest.mjs": {
       "required": true,
@@ -76,7 +80,7 @@
     },
     "scripts/codex_work_item_executor.mjs": {
       "required": true,
-      "sha256": "5546769074ba6837d5388256056a59b52be8d2fb972e0c1dde06faadd253d943"
+      "sha256": "ec1fc30d0235dc8fbad6136ed920390b57b4477e933c6ec48492bc20373c1250"
     },
     "scripts/create_service_from_capability.mjs": {
       "required": true,
@@ -84,7 +88,15 @@
     },
     "scripts/discover_capabilities.mjs": {
       "required": true,
-      "sha256": "8f871ed0ba6c52aa37f50c7f73fa2bfa670cf7615d98c2201aa1e9898f31b7d3"
+      "sha256": "16825194db13a0211cacb88cdf432d9bcab0fbe7fc63df7f24f2ce3967b96d8f"
+    },
+    "scripts/environment_security.mjs": {
+      "required": true,
+      "sha256": "80f5d92b45fbde1273e5d02291aedf82ff13526780c2a66226d9dec107c2c515"
+    },
+    "scripts/executor_protocol.mjs": {
+      "required": true,
+      "sha256": "8126f7c86ec66cc80b4f462cdfcb06ed4be84a385d2c98092735a8310d7a01bf"
     },
     "scripts/install_and_connect.mjs": {
       "required": true,
@@ -92,7 +104,7 @@
     },
     "scripts/lib.mjs": {
       "required": true,
-      "sha256": "1ca81db53e80d97a72408ac74f3e5dbfec2c2e4589b946a4734bcb05b04bcc1e"
+      "sha256": "8a8ffe7bfa1e67b2a70f681a14be6e244731f41ac6604ab3376f05f651908731"
     },
     "scripts/list_runs.mjs": {
       "required": true,
@@ -118,9 +130,13 @@
       "required": true,
       "sha256": "36790b33f27942f173b7e1b7e9e72d36df0726e6fe03a410bda530ba7b9e918e"
     },
+    "scripts/report_progress.mjs": {
+      "required": true,
+      "sha256": "c486774327c0236d6a9576ac77ec45212e6163f0e187fa506d1e14b45e124845"
+    },
     "scripts/refresh_manifest.mjs": {
       "required": true,
-      "sha256": "1a8cad3bfd6ee76443e5717de316ad9b2a8d5fd8d614c30767a863248b6aa9dd"
+      "sha256": "b7eef3c901b3636c7525b1ff36a328f7c1c540d2f611569c1df28cc108a5bb37"
     },
     "scripts/review_manifest_server.mjs": {
       "required": true,
@@ -128,15 +144,19 @@
     },
     "scripts/run_work_item.mjs": {
       "required": true,
-      "sha256": "919dcffab1648a6c2cd5f46688603d382bb621023d1832d58f766c1c2994f975"
+      "sha256": "86a1ef727d1f63ec5592f6b7a13358a99e2842756774d26acc3eed012de7c7ee"
+    },
+    "scripts/runtime_activity.mjs": {
+      "required": true,
+      "sha256": "d7a786613e694a117f03f1c2a2c80f3c923b5b716d09b3b78054d89b37d6c3b5"
     },
     "scripts/start_worker.mjs": {
       "required": true,
-      "sha256": "c246cc550800e64f0e6cd14b0dff267342f83dbb7c73d9bad4920664ee0c7d6d"
+      "sha256": "857a525e3bdb5dba26dbed06eeb5fa841077e24a6627130879dbc8b1341960a2"
     },
     "scripts/runtime_tick.mjs": {
       "required": true,
-      "sha256": "03b161e1d02d190939033b08503e6f4530c198313c9ae85ae918334abf04217a"
+      "sha256": "2371d3073f269484d8016e7e257f7442b8852121bd97d8cdd0597783c32d4ce2"
     },
     "scripts/sync_capabilities.mjs": {
       "required": true,
@@ -152,7 +172,7 @@
     },
     "scripts/upload_artifact.mjs": {
       "required": true,
-      "sha256": "6525bbe19f4b0495d8dd6efc0e4189ef8def09d494c742d5c9326f5fde27de4d"
+      "sha256": "cec6affc7117153870a6f75abf680be6df4416317870771d6f95df87813013a4"
     },
     "scripts/upload_manifest.mjs": {
       "required": true,
@@ -164,7 +184,7 @@
     },
     "scripts/validate_skill.mjs": {
       "required": true,
-      "sha256": "25ba6097c6f402fe2ffa84ed688adf91e7581950bb386a731957d12541a274a0"
+      "sha256": "ee49264d374ae9e446aa90585a9dbbbed8d98d97de8e027a17f16eb6eec04798"
     },
     "scripts/verify_real_platform.mjs": {
       "required": true,
@@ -172,7 +192,7 @@
     },
     "scripts/worker_daemon.mjs": {
       "required": true,
-      "sha256": "8e641bae9087022a02ade32e240b49b387e577e0298cc5a2710455c93427cefe"
+      "sha256": "002344fc9b29b2115029945ac9e44b2e062acf2ed7adda0d6ea1636e8c0a2ef5"
     }
   }
 }

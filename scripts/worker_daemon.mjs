@@ -6,11 +6,18 @@ import { runRuntimeTick } from './runtime_tick.mjs'
 import { apiBase, arg, numberArg, parseArgs, readConnectionConfig, writeJson } from './lib.mjs'
 
 const EXECUTABLE_WORK_ITEM_STATUSES = new Set(['queued', 'revision_requested', 'revising', 'claimed', 'running'])
-const DEFAULT_EXECUTOR_TIMEOUT_MS = 30 * 60 * 1000
 const DEFAULT_EXECUTOR_KILL_GRACE_MS = 5000
 
+function safeCwd(fallback = process.env.HOME || '/tmp') {
+  try {
+    return process.cwd()
+  } catch {
+    return fallback
+  }
+}
+
 function defaultOutputDir() {
-  return path.resolve(process.cwd(), '.kaigongba/runtime')
+  return path.resolve(safeCwd(), '.kaigongba/runtime')
 }
 
 function compact(value) {
@@ -32,6 +39,11 @@ function positiveNumberArg(value, fallback) {
 function optionalPositiveNumberArg(value) {
   const parsed = numberArg(value, undefined)
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined
+}
+
+function outputDirArg(args = {}) {
+  const explicit = arg(args, ['output-dir', 'outputDir'], undefined)
+  return path.resolve(String(explicit || defaultOutputDir()))
 }
 
 function sleep(ms) {
@@ -87,7 +99,7 @@ async function writeWorkerStatus(statusFile, state) {
 }
 
 function resolvedArgs(args = {}, config = {}) {
-  const outputDir = path.resolve(String(arg(args, ['output-dir', 'outputDir'], defaultOutputDir())))
+  const outputDir = outputDirArg(args)
   const connectionId = compact(arg(args, ['connection-id', 'connectionId'], process.env.KAIGONGBA_CONNECTION_ID || config.connectionId))
   const executorCommand = compact(arg(args, ['executor-command', 'executorCommand'], process.env.KAIGONGBA_EXECUTOR_COMMAND))
   return {
@@ -97,7 +109,12 @@ function resolvedArgs(args = {}, config = {}) {
     statusFile: path.resolve(String(arg(args, ['status-file', 'statusFile'], path.join(outputDir, 'worker-status.json')))),
     pollIntervalMs: positiveNumberArg(arg(args, ['poll-interval-ms', 'pollIntervalMs'], process.env.KAIGONGBA_WORKER_POLL_INTERVAL_MS), 5000),
     errorIntervalMs: positiveNumberArg(arg(args, ['error-interval-ms', 'errorIntervalMs'], process.env.KAIGONGBA_WORKER_ERROR_INTERVAL_MS), 15000),
-    timeoutMs: positiveNumberArg(arg(args, ['timeout-ms', 'timeoutMs'], process.env.KAIGONGBA_EXECUTOR_TIMEOUT_MS), DEFAULT_EXECUTOR_TIMEOUT_MS),
+    timeoutMs: optionalPositiveNumberArg(arg(args, ['timeout-ms', 'timeoutMs'], process.env.KAIGONGBA_EXECUTOR_TIMEOUT_MS)),
+    idleTimeoutMs: optionalPositiveNumberArg(arg(
+      args,
+      ['idle-timeout-ms', 'idleTimeoutMs'],
+      process.env.KAIGONGBA_EXECUTOR_IDLE_TIMEOUT_MS,
+    )),
     executorKillGraceMs: positiveNumberArg(
       arg(args, ['executor-kill-grace-ms', 'executorKillGraceMs'], process.env.KAIGONGBA_EXECUTOR_KILL_GRACE_MS),
       DEFAULT_EXECUTOR_KILL_GRACE_MS,
@@ -153,14 +170,16 @@ export async function runWorkerDaemon(args = {}, deps = {}) {
         continue
       }
 
-      const run = await runWorkItem({
+      const runArgs = {
         ...args,
         outputDir: options.outputDir,
         connectionId,
         executorCommand: options.executorCommand,
-        timeoutMs: options.timeoutMs,
         executorKillGraceMs: options.executorKillGraceMs,
-      })
+      }
+      if (options.timeoutMs !== undefined) runArgs.timeoutMs = options.timeoutMs
+      if (options.idleTimeoutMs !== undefined) runArgs.idleTimeoutMs = options.idleTimeoutMs
+      const run = await runWorkItem(runArgs)
       state.runs += 1
       state.lastRun = summarizeRun(run)
       if (!run.ok) {

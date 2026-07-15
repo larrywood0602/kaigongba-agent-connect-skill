@@ -54,6 +54,27 @@ function manifestFiles(manifest) {
   return manifest.files || {}
 }
 
+export function validatePackageManifestParity(packageFiles = [], files = {}) {
+  const expected = new Set([
+    'package.json',
+    ...packageFiles.filter((file) => (
+      typeof file === 'string'
+      && file.length > 0
+      && file !== 'manifest.json'
+      && !file.endsWith('/')
+    )),
+  ])
+  const actual = new Set(Object.keys(files).filter((file) => file !== 'manifest.json'))
+  const errors = []
+  for (const file of expected) {
+    if (!actual.has(file)) errors.push(`manifest missing packaged file entry: ${file}`)
+  }
+  for (const file of actual) {
+    if (!expected.has(file)) errors.push(`manifest contains file not declared for package publication: ${file}`)
+  }
+  return errors
+}
+
 export async function validateSkill() {
   const errors = []
   const warnings = []
@@ -70,6 +91,7 @@ export async function validateSkill() {
   }
 
   const files = manifestFiles(manifest)
+  errors.push(...validatePackageManifestParity(pkg.files, files))
   for (const file of REQUIRED_FILES) {
     if (!files[file]) errors.push(`manifest missing required package file entry: ${file}`)
   }

@@ -1,6 +1,6 @@
 {
   "name": "kaigongba-agent-connect-skill",
-  "version": "0.3.7",
+  "version": "0.3.9",
   "type": "module",
   "bin": {
     "kaigongba-agent-connect-skill": "scripts/install_and_connect.mjs"
@@ -11,6 +11,7 @@
     "README.md",
     "agents/openai.yaml",
     "assets/manifest.example.json",
+    "references/connection-rotation.md",
     "references/api.md",
     "references/manifest-schema.md",
     "references/event-schema.md",
@@ -21,6 +22,8 @@
     "scripts/codex_work_item_executor.mjs",
     "scripts/create_service_from_capability.mjs",
     "scripts/discover_capabilities.mjs",
+    "scripts/environment_security.mjs",
+    "scripts/executor_protocol.mjs",
     "scripts/install_and_connect.mjs",
     "scripts/lib.mjs",
     "scripts/list_runs.mjs",
@@ -29,9 +32,11 @@
     "scripts/onboard.mjs",
     "scripts/publish_service.mjs",
     "scripts/readiness.mjs",
+    "scripts/report_progress.mjs",
     "scripts/refresh_manifest.mjs",
     "scripts/review_manifest_server.mjs",
     "scripts/run_work_item.mjs",
+    "scripts/runtime_activity.mjs",
     "scripts/start_worker.mjs",
     "scripts/runtime_tick.mjs",
     "scripts/sync_capabilities.mjs",
